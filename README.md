@@ -1,6 +1,6 @@
 # O-PAS ACP AI Agent — Diagnóstico & Manutenção Preditiva em Automação Aberta
 
-Evolução do protótipo de **Nó de Controle Distribuído (DCN)** baseado no padrão **O-PAS** ([`s-pedrolima/TCC-OPAS`](https://github.com/s-pedrolima/TCC-OPAS)), adicionando a camada **OCF** programática (OPC UA + Historian) e materializando a camada **ACP (Advanced Computing Platform)** com um **Agente de IA** para diagnóstico de causa raiz, análise de gargalos e monitoramento preditivo de uma estação de soldagem industrial (*Welding Station*).
+Evolução do protótipo de **Nó de Controle Distribuído (DCN)** baseado no padrão **O-PAS** ([`s-pedrolima/tcc-opas`](https://github.com/s-pedrolima/tcc-opas)), adicionando a camada **OCF** programática (OPC UA + Historian) e materializando a camada **ACP (Advanced Computing Platform)** com um **Agente de IA** para diagnóstico de causa raiz, análise de gargalos e monitoramento preditivo de uma estação de soldagem industrial (*Welding Station*).
 
 ---
 

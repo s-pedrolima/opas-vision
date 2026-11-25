@@ -102,6 +102,15 @@ def build_client() -> tuple[OpenAI, str]:
 # ---------------------------------------------------------------------------
 # O Agent Loop (o núcleo de qualquer agente de IA!)
 # ---------------------------------------------------------------------------
+def _print_token_usage(prompt_tokens: int, completion_tokens: int) -> None:
+    if prompt_tokens or completion_tokens:
+        print(
+            f"\n[tokens] prompt={prompt_tokens} | "
+            f"completion={completion_tokens} | "
+            f"total={prompt_tokens + completion_tokens}"
+        )
+
+
 def run_agent_turn(
     client: OpenAI,
     model: str,
@@ -139,13 +148,7 @@ def run_agent_turn(
         if not assistant_msg.tool_calls:
             final_text = assistant_msg.content or "(Sem resposta textual da LLM)"
             messages.append({"role": "assistant", "content": final_text})
-
-            if total_prompt_tokens or total_completion_tokens:
-                print(
-                    f"\n[tokens] prompt={total_prompt_tokens} | "
-                    f"completion={total_completion_tokens} | "
-                    f"total={total_prompt_tokens + total_completion_tokens}"
-                )
+            _print_token_usage(total_prompt_tokens, total_completion_tokens)
             return final_text
 
         # 3. Caso B: a LLM pediu 1 ou mais tools (suporta parallel tool calls!).
@@ -206,6 +209,40 @@ def run_agent_turn(
 
         # Ao chegar aqui, o `for` volta ao topo e manda os resultados das tools para a LLM!
 
+    # Síntese graciosa: se consumiu todos os passos chamando tools, faz 1 chamada final
+    # SEM tools para obrigar o modelo a sintetizar tudo o que já coletou (em vez de
+    # jogar fora o trabalho dos 8 passos!).
+    print(f"  [limite {MAX_AGENT_STEPS} passos] -> solicitando síntese final sem novas tools...")
+    synthesis_messages = [
+        *messages,
+        {
+            "role": "user",
+            "content": (
+                "Limite de consultas de ferramentas atingido. Com base exclusivamente "
+                "nas evidências já coletadas acima, apresente agora sua síntese e "
+                "diagnóstico técnico final estruturado."
+            ),
+        },
+    ]
+    try:
+        synth_response = client.chat.completions.create(
+            model=model,
+            messages=synthesis_messages,
+            temperature=0.2,
+        )
+        if synth_response.usage:
+            total_prompt_tokens += synth_response.usage.prompt_tokens or 0
+            total_completion_tokens += synth_response.usage.completion_tokens or 0
+
+        final_text = (synth_response.choices[0].message.content or "").strip()
+        if final_text:
+            messages.append({"role": "assistant", "content": final_text})
+            _print_token_usage(total_prompt_tokens, total_completion_tokens)
+            return final_text
+    except Exception as exc:
+        print(f"  [erro na síntese final]: {exc}", file=sys.stderr)
+
+    _print_token_usage(total_prompt_tokens, total_completion_tokens)
     return (
         f"[AVISO] O agente atingiu o limite máximo de {MAX_AGENT_STEPS} passos "
         "sem concluir uma resposta final."

@@ -1,0 +1,34 @@
+services:
+  openplc:
+    image: spedrol/soft-plc-ws:1.0 # SoftPLC docker image with control logic for WeldingStation
+    ports:
+      - "503:502" # Modbus TCP communication port
+    networks:
+      - dcn-net
+    deploy:
+      restart_policy:
+        condition: any
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+
+  nodered:
+    image: spedrol/system-monitor-ws:1.0 # Node-RED configured docker image
+    ports:
+      - "1881:1880" # Dashboard Access
+    networks:
+      - dcn-net
+    environment:
+      - DCN_ID=DCN-WS # Environment variable used to identify the DCN
+    volumes:
+      - ../HMI/flows-sm-ws.json:/data/flows.json:ro # Usa o fluxo versionado no repo (ns=2, SecurityMode=None)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      restart_policy:
+        condition: any
+
+networks:
+  dcn-net:
+    driver: overlay # Docker network for internal communication

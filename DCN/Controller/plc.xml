@@ -1,0 +1,200 @@
+<?xml version='1.0' encoding='utf-8'?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:ns1="http://www.plcopen.org/xml/tc6_0201">
+  <fileHeader companyName="Unknown" productName="Unnamed" productVersion="1" creationDateTime="2025-10-21T17:29:19"/>
+  <contentHeader name="Unnamed" modificationDateTime="2025-11-02T18:15:02">
+    <coordinateInfo>
+      <fbd>
+        <scaling x="10" y="10"/>
+      </fbd>
+      <ld>
+        <scaling x="10" y="10"/>
+      </ld>
+      <sfc>
+        <scaling x="10" y="10"/>
+      </sfc>
+    </coordinateInfo>
+  </contentHeader>
+  <types>
+    <dataTypes/>
+    <pous>
+      <pou name="Welding_Station" pouType="program">
+        <interface>
+          <localVars>
+            <variable name="Conveyor_Run" address="%QX0.0">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Base_Up" address="%QX0.1">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Base_Rotate" address="%QX0.2">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Base_Down" address="%QX0.3">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Shield_Down" address="%QX0.4">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Shield_Up" address="%QX0.5">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Burner" address="%QX0.6">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Piece_Pos_Sensor" address="%IX0.0">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Base_Up_Sensor" address="%IX0.1">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Base_Down_Sensor" address="%IX0.2">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Shield_Down_Sensor" address="%IX0.3">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Shield_Up_Sensor" address="%IX0.4">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Piece_Welded" address="%M0.0">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="Machine_Step" address="%MW0">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+          </localVars>
+          <localVars>
+            <variable name="T_Weld">
+              <type>
+                <derived name="TON"/>
+              </type>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p><![CDATA[(* Estado 0 – Aguardando Peça *)
+IF Machine_Step = 0 THEN
+    Conveyor_Run := TRUE;
+    IF Piece_Pos_Sensor THEN
+        Machine_Step := 1;
+    END_IF;
+END_IF;
+
+(* Estado 1 – Parar Esteira e Preparar *)
+IF Machine_Step = 1 THEN
+    Conveyor_Run := FALSE;
+    Base_Up := TRUE;
+    Shield_Down := TRUE;
+
+    IF Base_Up_Sensor THEN
+        Base_Up := FALSE;
+    END_IF;
+    
+    IF Shield_Down_Sensor THEN
+      Shield_Down := FALSE;
+    END_IF;
+
+    IF Base_Up_Sensor AND Shield_Down_Sensor THEN
+        Machine_Step := 2;
+    END_IF;
+END_IF;
+
+(* Estado 2 – Soldagem *)
+IF Machine_Step = 2 THEN
+    Base_Rotate := TRUE;
+    Burner := TRUE;
+
+    T_Weld(IN:=TRUE, PT:=T#10s);
+
+    IF T_Weld.Q THEN
+        Piece_Welded := TRUE;
+        Machine_Step := 3;
+        T_Weld(IN:=FALSE);
+    END_IF;
+END_IF;
+
+(* Estado 3 – Finalizar e Liberar Peça *)
+IF Machine_Step = 3 THEN
+    Base_Rotate := FALSE;
+    Burner := FALSE;
+    Shield_Up := TRUE;
+    Base_Down := TRUE;
+    
+    IF Base_Down_Sensor THEN
+        Base_Down := FALSE;
+    END_IF;
+    
+    IF Shield_Up_Sensor THEN
+      Shield_Up := FALSE;
+    END_IF;
+
+    IF Shield_Up_Sensor AND Base_Down_Sensor THEN
+        Machine_Step := 4;
+    END_IF;
+END_IF;
+
+(* Estado 4 – Liberar Peça na Esteira *)
+IF Machine_Step = 4 THEN
+    Conveyor_Run := TRUE;
+
+    IF NOT Piece_Pos_Sensor THEN
+        Piece_Welded := FALSE;
+        Machine_Step := 0;
+    END_IF;
+END_IF;
+
+
+]]></xhtml:p>
+          </ST>
+        </body>
+      </pou>
+    </pous>
+  </types>
+  <instances>
+    <configurations>
+      <configuration name="Config0">
+        <resource name="Res0">
+          <task name="task0" priority="0" interval="T#20ms">
+            <pouInstance name="instance0" typeName="Welding_Station"/>
+          </task>
+        </resource>
+        <globalVars>
+          <variable name="LocalVar0">
+            <type>
+              <DINT/>
+            </type>
+          </variable>
+        </globalVars>
+      </configuration>
+    </configurations>
+  </instances>
+</project>

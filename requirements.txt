@@ -1,0 +1,9 @@
+# Camada de Campo (Modbus TCP <-> OpenPLC)
+pymodbus>=3.6
+
+# Camada OCF (Servidor e Cliente OPC UA)
+asyncua>=1.1
+
+# Camada ACP (AI Agent OpenAI-compatible + carregamento de .env)
+openai>=1.40
+python-dotenv>=1.0

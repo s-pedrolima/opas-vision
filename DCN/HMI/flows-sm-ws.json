@@ -1,0 +1,1014 @@
+[
+    {
+        "id": "f6f2187d.f17ca8",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "8ec111125997815d",
+        "type": "modbus-client",
+        "name": "OpenPLC Runtime",
+        "clienttype": "tcp",
+        "bufferCommands": true,
+        "stateLogEnabled": false,
+        "queueLogEnabled": false,
+        "failureLogEnabled": true,
+        "tcpHost": "openplc",
+        "tcpPort": "502",
+        "tcpType": "DEFAULT",
+        "serialPort": "/dev/ttyUSB",
+        "serialType": "RTU-BUFFERD",
+        "serialBaudrate": 9600,
+        "serialDatabits": 8,
+        "serialStopbits": 1,
+        "serialParity": "none",
+        "serialConnectionDelay": 100,
+        "serialAsciiResponseStartDelimiter": "0x3A",
+        "unit_id": 1,
+        "commandDelay": 1,
+        "clientTimeout": 1000,
+        "reconnectOnTimeout": true,
+        "reconnectTimeout": 2000,
+        "parallelUnitIdsAllowed": true,
+        "showErrors": false,
+        "showWarnings": true,
+        "showLogs": true
+    },
+    {
+        "id": "1ad790200119f6c9",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "f93e824a064e783c",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#0094CE",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "2f3e728e41fc24bb",
+        "type": "ui-page",
+        "name": "Main Page",
+        "ui": "1ad790200119f6c9",
+        "path": "/page1",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "f93e824a064e783c",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "0356c747f1a2f24e",
+        "type": "ui-group",
+        "name": "Welding Station",
+        "page": "2f3e728e41fc24bb",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "c98c930a665fe80d",
+        "type": "OpcUa-Endpoint",
+        "endpoint": "${OPCUA_ENDPOINT}",
+        "secpol": "None",
+        "secmode": "None",
+        "none": true,
+        "login": false,
+        "usercert": false,
+        "usercertificate": "",
+        "userprivatekey": ""
+    },
+    {
+        "id": "1c4caf341e177c90",
+        "type": "global-config",
+        "env": [
+            {
+                "name": "DCN_ID",
+                "value": "DCN_ID",
+                "type": "env"
+            },
+            {
+                "name": "OPCUA_ENDPOINT",
+                "value": "OPCUA_ENDPOINT",
+                "type": "env"
+            }
+        ],
+        "modules": {
+            "node-red-contrib-modbus": "5.45.2",
+            "@flowfuse/node-red-dashboard": "1.29.0",
+            "node-red-contrib-opcua": "0.2.339"
+        }
+    },
+    {
+        "id": "c74d16db22472e50",
+        "type": "modbus-read",
+        "z": "f6f2187d.f17ca8",
+        "name": "Coils",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "showWarnings": true,
+        "unitid": "",
+        "dataType": "Coil",
+        "adr": "0",
+        "quantity": "12",
+        "rate": "500",
+        "rateUnit": "ms",
+        "delayOnStart": false,
+        "enableDeformedMessages": false,
+        "startDelayTime": "",
+        "server": "8ec111125997815d",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 90,
+        "y": 140,
+        "wires": [
+            [
+                "a4dfe2fd1033e4d5",
+                "86bf75b28f42651e",
+                "d28813845b00337a"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "546a3f571e946d4f",
+        "type": "modbus-read",
+        "z": "f6f2187d.f17ca8",
+        "name": "Holding Registers",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "showWarnings": true,
+        "unitid": "",
+        "dataType": "HoldingRegister",
+        "adr": "1024",
+        "quantity": "1",
+        "rate": "500",
+        "rateUnit": "ms",
+        "delayOnStart": false,
+        "enableDeformedMessages": false,
+        "startDelayTime": "",
+        "server": "8ec111125997815d",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 130,
+        "y": 80,
+        "wires": [
+            [
+                "f708d0d3941c9f13",
+                "d28813845b00337a",
+                "86bf75b28f42651e"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "a4dfe2fd1033e4d5",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Payload to JSON",
+        "func": "var coils = msg.payload;\n\nmsg.payload = {\n    \"Conveyor_Run\": coils[0],\n    \"Base_Up\": coils[1],\n    \"Base_Rotate\": coils[2],\n    \"Base_Down\": coils[3],\n    \"Shield_Down\": coils[4],\n    \"Shield_Up\": coils[5],\n    \"Burner\": coils[6],\n    \"Piece_Pos_Sensor\": coils[7],\n    \"Base_Up_Sensor\": coils[8],\n    \"Base_Down_Sensor\": coils[9],\n    \"Shield_Down_Sensor\": coils[10],\n    \"Shield_Up_Sensor\": coils[11]\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 240,
+        "wires": [
+            [
+                "58b9eff72e8be032",
+                "de1dcf1c7d06a823"
+            ]
+        ],
+        "icon": "node-red/parser-json.svg"
+    },
+    {
+        "id": "f708d0d3941c9f13",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Payload to String",
+        "func": "function getState(num) {\n    switch (num) {\n        case 0: return \"⏳ WAITING FOR NEW PIECE\";\n        case 1: return \"⚙️ PREPARING TO WELD\";\n        case 2: return \"🔥 WELDING\";\n        case 3: return \"⚙️ FINISHING PROCESS\";\n        case 4: {\n            n++; \n            return \"✔️ PIECE RELEASED\";    \n        }\n        default: return \"ERROR\";\n    }\n}\n\nvar n = flow.get(\"pieces_welded\") || 0;\nmsg.payload = getState(msg.payload[0]);\nif(n !== flow.get(\"pieces_welded\")) {\n    flow.set(\"pieces_welded\", n);\n}\nmsg.count = n;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 80,
+        "wires": [
+            [
+                "328cd8a892fe6d53"
+            ]
+        ],
+        "icon": "font-awesome/fa-strikethrough"
+    },
+    {
+        "id": "328cd8a892fe6d53",
+        "type": "ui-template",
+        "z": "f6f2187d.f17ca8",
+        "group": "0356c747f1a2f24e",
+        "page": "",
+        "ui": "",
+        "name": "State Display",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<template>\n  <div class=\"state-container\">\n    <div class=\"machine-state\">\n      <span class=\"label\">Machine State:</span>\n      <span class=\"state\" :class=\"stateClass\">{{ msg.payload }}</span>\n    </div>\n\n    <div class=\"counting-pieces\">\n      <span class=\"count-label\">Welded Pieces:</span>\n      <span class=\"count-value\">{{ msg.count }}</span>\n    </div>\n  </div>\n</template>\n\n<script>\n  export default {\n  props: [\"msg\"],\n  computed: {\n    stateClass() {\n      const s = (this.msg?.payload || \"\").toUpperCase();\n      if (s.includes(\"WELDING\")) return \"welding\";\n      if (s.includes(\"RELEASED\")) return \"released\";\n      if (s.includes(\"ERROR\")) return \"error\";\n      return \"other\";\n    }\n  }\n}\n</script>\n\n<style scoped>\n\n  .state-container {\n    position: relative;\n    width: 100%;\n    height: 60px;\n    padding: 6px 12px;\n    display: flex;\n    flex-direction: column;\n    justify-content: center;\n    box-sizing: border-box;\n    overflow: hidden;\n  }\n\n  .machine-state {\n    font-size: 1rem;\n    font-weight: 600;\n    display: flex;\n    align-items: center;\n  }\n\n  .counting-pieces {\n    margin-top: 4px;\n    font-size: 0.95rem;\n    font-weight: 600;\n    display: flex;\n    align-items: center;\n    gap: 6px;\n  }\n\n  .label,\n  .count-label {\n    color: #000;\n    margin-right: 6px;\n  }\n\n  .count-value {\n    font-weight: 700;\n    padding: 2px 6px;\n    border-radius: 6px;\n    background: #eaeaea;\n    transition: background 0.4s, transform 0.4s;\n  }\n\n  .count-value:not(:empty) {\n    background: linear-gradient(90deg, #4CAF50, #2ECC71);\n    color: white;\n    transform: scale(1.05);\n  }\n\n  .state.released {\n    background: linear-gradient(90deg, #2ecc71, #27ae60);\n    background-clip: text;\n    -webkit-background-clip: text;\n    color: transparent;\n  }\n\n  .state.welding {\n    background: linear-gradient(90deg, #e74c3c, #f39c12, #e74c3c);\n    background-size: 200% 200%;\n    background-clip: text;\n    -webkit-background-clip: text;\n    color: transparent;\n    animation: weld 2s linear infinite;\n  }\n\n  @keyframes weld {\n    0% {\n      background-position: 200% 0;\n    }\n\n    100% {\n      background-position: -200% 0;\n    }\n  }\n\n  .state.error {\n    color: #e74c3c !important;\n    background: none !important;\n    text-shadow: 0px 0px 6px rgba(231, 76, 60, 0.4);\n  }\n\n  .state.other {\n    background: linear-gradient(90deg, #888, #555, #888);\n    background-size: 200% 200%;\n    background-clip: text;\n    -webkit-background-clip: text;\n    color: transparent;\n    animation: shift 2.5s linear infinite;\n  }\n\n  @keyframes shift {\n    0% {\n      background-position: 200% 0;\n    }\n\n    100% {\n      background-position: -200% 0;\n    }\n  }\n</style>",
+        "storeOutMessages": true,
+        "passthru": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 570,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "58b9eff72e8be032",
+        "type": "ui-template",
+        "z": "f6f2187d.f17ca8",
+        "group": "0356c747f1a2f24e",
+        "page": "",
+        "ui": "",
+        "name": "Actuators/Sensors",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<template>\n  <div class=\"indicator-grid\">\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Conveyor_Run ? 'green darken-1' : 'grey'\"\n        :class=\"{ 'spin-animation': coils.Conveyor_Run }\">\n        mdi-cog\n      </v-icon>\n      <span class=\"name\">Conveyor</span>\n      <span class=\"status\" :class=\"{ 'active': coils.Conveyor_Run }\">\n        {{ coils.Conveyor_Run ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon v-if=\"coils.Base_Up\" size=\"48\" color=\"green darken-1\">mdi-arrow-up-bold-circle</v-icon>\n      <v-icon v-else-if=\"coils.Base_Down\" size=\"48\" color=\"green darken-1\">mdi-arrow-down-bold-circle</v-icon>\n      <v-icon v-else size=\"48\" color=\"grey\">mdi-stop-circle-outline</v-icon>\n\n      <span class=\"name\">Work Base</span>\n      <span class=\"status\" :class=\"baseStatusClass\">\n        {{ baseStatusText }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Base_Rotate ? 'green darken-1' : 'grey'\"\n        :class=\"{ 'spin-animation': coils.Base_Rotate }\">\n        mdi-cog\n      </v-icon>\n      <span class=\"name\">Base Rotation</span>\n      <span class=\"status\" :class=\"{ 'active': coils.Base_Rotate }\">\n        {{ coils.Base_Rotate ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon v-if=\"coils.Shield_Up\" size=\"48\" color=\"green darken-1\">mdi-arrow-up-bold-circle</v-icon>\n      <v-icon v-else-if=\"coils.Shield_Down\" size=\"48\" color=\"green darken-1\">mdi-arrow-down-bold-circle</v-icon>\n      <v-icon v-else size=\"48\" color=\"grey\">mdi-stop-circle-outline</v-icon>\n\n      <span class=\"name\">Suction Shield</span>\n      <span class=\"status\" :class=\"shieldStatusClass\">\n        {{ shieldStatusText }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Burner ? 'orange darken-2' : 'grey'\" :class=\"{ 'flame-animation': coils.Burner }\">\n        mdi-fire\n      </v-icon>\n      <span class=\"name\">Burner</span>\n      <span class=\"status\" :class=\"{ 'active': coils.Burner }\">\n        {{ coils.Burner ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n    <div class=\"separator\"></div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Base_Up_Sensor ? 'red' : 'grey'\" :class=\"{ 'sensor-glow': coils.Base_Up_Sensor }\">\n        mdi-access-point\n      </v-icon>\n      <span class=\"name\">Workbase Top Sensor</span>\n      <span class=\"status\" :class=\"{ 'active-sensor': coils.Base_Up_Sensor }\">\n        {{ coils.Base_Up_Sensor ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Base_Down_Sensor ? 'red' : 'grey'\"\n        :class=\"{ 'sensor-glow': coils.Base_Down_Sensor }\">\n        mdi-access-point\n      </v-icon>\n      <span class=\"name\">Workbase Bottom Sensor</span>\n      <span class=\"status\" :class=\"{ 'active-sensor': coils.Base_Down_Sensor }\">\n        {{ coils.Base_Down_Sensor ? 'ON' : 'OFF' }}\n      </span>\n\n    </div>\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Piece_Pos_Sensor ? 'red' : 'grey'\"\n        :class=\"{ 'sensor-glow': coils.Piece_Pos_Sensor }\">\n        mdi-access-point\n      </v-icon>\n      <span class=\"name\">Piece Sensor</span>\n      <span class=\"status\" :class=\"{ 'active-sensor': coils.Piece_Pos_Sensor }\">\n              {{ coils.Piece_Pos_Sensor ? 'ON' : 'OFF' }}\n        </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Shield_Down_Sensor ? 'red' : 'grey'\"\n        :class=\"{ 'sensor-glow': coils.Shield_Down_Sensor }\">\n        mdi-access-point\n      </v-icon>\n      <span class=\"name\">Shield Bottom Sensor</span>\n      <span class=\"status\" :class=\"{ 'active-sensor': coils.Shield_Down_Sensor }\">\n        {{ coils.Shield_Down_Sensor ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n    <div class=\"indicator-block\">\n      <v-icon size=\"48\" :color=\"coils.Shield_Up_Sensor ? 'red' : 'grey'\"\n        :class=\"{ 'sensor-glow': coils.Shield_Up_Sensor }\">\n        mdi-access-point\n      </v-icon>\n      <span class=\"name\">Shield Top Sensor</span>\n      <span class=\"status\" :class=\"{ 'active-sensor': coils.Shield_Up_Sensor }\">\n        {{ coils.Shield_Up_Sensor ? 'ON' : 'OFF' }}\n      </span>\n    </div>\n\n  </div>\n</template>\n\n<script>\n  export default {\n    props: ['msg'],\n    computed: {\n      coils() {\n        // Default object to prevent 'undefined' errors\n        const defaults = {\n          Conveyor_Run: false, Base_Up: false, Base_Rotate: false,\n          Base_Down: false, Shield_Down: false, Shield_Up: false,\n          Burner: false, Piece_Pos_Sensor: false, Base_Up_Sensor: false,\n          Base_Down_Sensor: false, Shield_Down_Sensor: false, Shield_Up_Sensor: false\n        };\n        return { ...defaults, ...this.msg?.payload };\n      },\n      \n      // --- Logic for Grouped Block: BASE ---\n      baseStatusText() {\n        if (this.coils.Base_Up) return 'MOVING UP';\n        if (this.coils.Base_Down) return 'MOVING DOWN';\n        return 'STOPPED';\n      },\n      baseStatusClass() {\n        // 'active' class for the green text\n        return (this.coils.Base_Up || this.coils.Base_Down) ? 'active' : '';\n      },\n\n      // --- Logic for Grouped Block: SHIELD ---\n      shieldStatusText() {\n        if (this.coils.Shield_Up) return 'MOVING UP';\n        if (this.coils.Shield_Down) return 'MOVING DOWN';\n        return 'STOPPED';\n      },\n      shieldStatusClass() {\n        return (this.coils.Shield_Up || this.coils.Shield_Down) ? 'active' : '';\n      }\n    }\n  }\n</script>\n\n<style>\n  /* --- The Main Grid (5 columns) --- */\n  .indicator-grid {\n    display: grid;\n    grid-template-columns: repeat(5, 1fr);\n    gap: 12px;\n    width: 100%;\n    height: 100%;\n    padding: 12px;\n    background-color: #f0f2f5;\n    box-sizing: border-box;\n  }\n\n  /* --- The Individual Block --- */\n  .indicator-block {\n    background: #ffffff;\n    border-radius: 8px;\n    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);\n    padding-top: 10px;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    justify-content: center;\n    /* Center everything */\n    min-height: 140px;\n    border: 1px solid #e0e0e0;\n  }\n\n  /* Center icon and give space */\n  .v-icon {\n    margin-bottom: 8px;\n  }\n\n  /* --- The Separator --- */\n  .separator {\n    grid-column: 1 / -1;\n    height: 1px;\n    background-color: #d0d0d0;\n    margin: 5px 0;\n  }\n\n  /* --- Animations --- */\n\n  /* 1. Spin Animation (Gear) */\n  .spin-animation {\n    animation: spin 2s linear infinite;\n  }\n\n  @keyframes spin {\n    from {\n      transform: rotate(0deg);\n    }\n\n    to {\n      transform: rotate(360deg);\n    }\n  }\n\n  /* 2. Flame Animation (Burner) */\n  .flame-animation {\n    animation: flameWobble 0.5s linear infinite;\n  }\n\n  @keyframes flameWobble {\n\n    0%,\n    100% {\n      transform: scale(1.0, 1.0);\n    }\n\n    50% {\n      transform: scale(0.9, 1.1) translateY(2px);\n    }\n  }\n\n  /* 3. Sensor Glow (Red) */\n  .sensor-glow {\n    text-shadow: 0 0 12px rgba(231, 76, 60, 0.9);\n  }\n\n  /* --- Text (Name and Status) --- */\n  .name {\n    font-size: 0.9rem;\n    font-weight: 600;\n    color: #333;\n    text-align: center;\n    line-height: 1.2;\n  }\n\n  .status {\n    font-size: 0.8rem;\n    font-weight: 600;\n    padding: 2px 8px;\n    border-radius: 4px;\n    margin-top: 8px;\n    color: #333;\n    /* Status OFF (Grey) */\n    background: #f0f0f0;\n  }\n\n  .status.active {\n    color: #27ae60;\n    /* Status ON (Green) */\n    background: #e8f5e9;\n  }\n\n  /* Special Status for Sensor (Red) */\n  .status.active-sensor {\n    color: #e74c3c;\n    /* Status ON (Red) */\n    background: #fbeee0;\n  }\n</style>",
+        "storeOutMessages": true,
+        "passthru": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 730,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "86bf75b28f42651e",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "OPCUA Data Constructor",
+        "func": "let DCN = env.get(\"DCN_ID\") || \"unknown\";\nif (DCN === \"unknown\") return null; \nconst dir = \"ns=2;s=\";\n\nif(msg.payload.length === 1) {\n    return {\n        payload: msg.payload[0],\n        topic: `${dir}${DCN}/Machine_State`,\n        datatype: \"Int16\"\n    };\n}\n\nconst opcuaData = [\n    \"Conveyor\",\n    \"Base_Up\",\n    \"Base_Rotate\",\n    \"Base_Down\",\n    \"Shield_Down\",\n    \"Shield_Up\",\n    \"Burner\",\n    \"Piece_Pos_Sensor\",\n    \"Base_Up_Sensor\",\n    \"Base_Down_Sensor\",\n    \"Shield_Down_Sensor\",\n    \"Shield_Up_Sensor\"\n];\n\nconst newmsg = [];\nfor (let i = 0; i < opcuaData.length; i++) {\n    newmsg.push({\n        payload: msg.payload[i],\n        topic: `${dir}${DCN}/${opcuaData[i]}`,\n        datatype: \"Boolean\"\n    });\n}\nreturn [newmsg]; ",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 180,
+        "wires": [
+            [
+                "50da3b39ebd9cb22"
+            ]
+        ],
+        "icon": "node-red-contrib-opcua/opcuanodeLogo.png"
+    },
+    {
+        "id": "50da3b39ebd9cb22",
+        "type": "OpcUa-Client",
+        "z": "f6f2187d.f17ca8",
+        "endpoint": "c98c930a665fe80d",
+        "action": "write",
+        "deadbandtype": "a",
+        "deadbandvalue": 1,
+        "time": 10,
+        "timeUnit": "s",
+        "certificate": "n",
+        "localfile": "",
+        "localkeyfile": "",
+        "securitymode": "None",
+        "securitypolicy": "None",
+        "useTransport": false,
+        "maxChunkCount": "",
+        "maxMessageSize": "",
+        "receiveBufferSize": "",
+        "sendBufferSize": "",
+        "setstatusandtime": false,
+        "keepsessionalive": true,
+        "name": "OPC UA Write",
+        "x": 620,
+        "y": 180,
+        "wires": [
+            [],
+            [
+                "d7930a74140814ac"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "d7930a74140814ac",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Redirect",
+        "func": "switch (msg.status) {\n    case \"session active\":\n    case \"connected\":\n    case \"disconnected\":\n    case \"reconnect\":\n        return [\n            { status: msg.status },\n            null\n        ];\n    default:\n        return [\n            null,\n            { status: msg.status }\n        ];\n}",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 745,
+        "y": 180,
+        "wires": [
+            [
+                "21530e543cfdcd89"
+            ],
+            [
+                "26272f32ae26113f"
+            ]
+        ],
+        "icon": "node-red/switch.svg",
+        "l": false
+    },
+    {
+        "id": "6e3938f663f53a35",
+        "type": "status",
+        "z": "f6f2187d.f17ca8",
+        "name": "Modbus Status",
+        "scope": [
+            "c74d16db22472e50",
+            "546a3f571e946d4f"
+        ],
+        "x": 55,
+        "y": 380,
+        "wires": [
+            [
+                "e881cc98fd6c64a4"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "733b57417a705e03",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "Nodeset 1: Main Operation Flow",
+        "info": "",
+        "x": 170,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "e881cc98fd6c64a4",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Modbus Status",
+        "func": "let status = msg.status.text.split(\" \")[0];\nmsg = {};\nmsg.topic = \"Modbus_Status\";\nlet alert_list = flow.get(\"Alert_List\") || [];\n\nswitch (status) {\n    case \"active\":\n        if (flow.get(\"Modbus_Status\") === false) {\n            if (alert_list.includes(\"Modbus_Status\")) {\n                let i = alert_list.indexOf(\"Modbus_Status\");\n                alert_list.splice(i, 1);\n                flow.set(\"Alert_List\", alert_list);\n            }\n            flow.set(\"Modbus_Status\", true);\n            msg.payload = true;\n            return msg;\n        }\n        break;\n\n    case \"broken\":\n        flow.set(\"Modbus_Status\", false);\n        msg.payload = false;\n        return msg;\n}",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "// Reset \nflow.set(\"Modbus_Status\", false);",
+        "finalize": "",
+        "libs": [],
+        "x": 200,
+        "y": 380,
+        "wires": [
+            [
+                "8e0ec484242ab4e6"
+            ]
+        ],
+        "icon": "font-awesome/fa-check-square"
+    },
+    {
+        "id": "333cbe4b78b7e831",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "OPCUA Status",
+        "func": "let status = msg.status;\nmsg = {};\nmsg.topic = \"OPCUA_Status\";\nlet alert_list = flow.get(\"Alert_List\") || [];\n\nswitch (status) {\n    case \"session active\":\n    case \"connected\":\n        if (alert_list.includes(\"OPCUA_Status\")) {\n            let i = alert_list.indexOf(\"OPCUA_Status\");\n            alert_list.splice(i, 1);\n            flow.set(\"Alert_List\", alert_list);\n        }\n        flow.set(\"OPCUA_Status\", true);\n        msg.payload = true;\n        return msg;\n\n    case \"reconnect\":\n    case \"disconnected\":\n        flow.set(\"OPCUA_Status\", false);\n        msg.payload = false;\n        return msg;\n}",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "// Reset\nflow.set(\"OPCUA_Status\", false);",
+        "finalize": "",
+        "libs": [],
+        "x": 200,
+        "y": 420,
+        "wires": [
+            [
+                "8e0ec484242ab4e6"
+            ]
+        ],
+        "icon": "font-awesome/fa-check-square"
+    },
+    {
+        "id": "21530e543cfdcd89",
+        "type": "link out",
+        "z": "f6f2187d.f17ca8",
+        "name": "link out 1",
+        "mode": "link",
+        "links": [
+            "6c603cb584ecbcbc"
+        ],
+        "x": 805,
+        "y": 160,
+        "wires": [],
+        "icon": "node-red/status.svg"
+    },
+    {
+        "id": "6c603cb584ecbcbc",
+        "type": "link in",
+        "z": "f6f2187d.f17ca8",
+        "name": "link in 1",
+        "links": [
+            "21530e543cfdcd89"
+        ],
+        "x": 55,
+        "y": 420,
+        "wires": [
+            [
+                "333cbe4b78b7e831"
+            ]
+        ],
+        "icon": "node-red/status.svg"
+    },
+    {
+        "id": "26272f32ae26113f",
+        "type": "link out",
+        "z": "f6f2187d.f17ca8",
+        "name": "link out 2",
+        "mode": "link",
+        "links": [
+            "89beab3bb246893a"
+        ],
+        "x": 805,
+        "y": 200,
+        "wires": [],
+        "icon": "node-red-contrib-opcua/opcuanodeLogo.png"
+    },
+    {
+        "id": "89beab3bb246893a",
+        "type": "link in",
+        "z": "f6f2187d.f17ca8",
+        "name": "link in 2",
+        "links": [
+            "26272f32ae26113f"
+        ],
+        "x": 55,
+        "y": 600,
+        "wires": [
+            [
+                "9fc0b0a7970a5864"
+            ]
+        ],
+        "icon": "node-red-contrib-opcua/opcuanodeLogo.png"
+    },
+    {
+        "id": "d28813845b00337a",
+        "type": "link out",
+        "z": "f6f2187d.f17ca8",
+        "name": "link out 3",
+        "mode": "link",
+        "links": [
+            "1649f2213bdf3aa3"
+        ],
+        "x": 295,
+        "y": 140,
+        "wires": [],
+        "icon": "node-red-contrib-modbus/modbus-icon.png"
+    },
+    {
+        "id": "1649f2213bdf3aa3",
+        "type": "link in",
+        "z": "f6f2187d.f17ca8",
+        "name": "link in 3",
+        "links": [
+            "d28813845b00337a"
+        ],
+        "x": 55,
+        "y": 560,
+        "wires": [
+            [
+                "9fcfd0edb8715e11"
+            ]
+        ],
+        "icon": "node-red-contrib-modbus/modbus-icon.png"
+    },
+    {
+        "id": "74c87ded0eac1a4d",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "Nodeset 2: Modbus TCP/OPC UA Communication",
+        "info": "",
+        "x": 230,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "9fcfd0edb8715e11",
+        "type": "join",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "payload",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "",
+        "count": "2",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "",
+        "reduceFixup": "",
+        "x": 125,
+        "y": 560,
+        "wires": [
+            [
+                "ce8fbce5f46f2b7f"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "ce8fbce5f46f2b7f",
+        "type": "rbe",
+        "z": "f6f2187d.f17ca8",
+        "name": "Reading Monitor",
+        "func": "rbe",
+        "gap": "",
+        "start": "",
+        "inout": "out",
+        "septopics": false,
+        "property": "payload",
+        "topi": "topic",
+        "x": 260,
+        "y": 560,
+        "wires": [
+            [
+                "ce1b805fcad9af80"
+            ]
+        ]
+    },
+    {
+        "id": "ce1b805fcad9af80",
+        "type": "trigger",
+        "z": "f6f2187d.f17ca8",
+        "name": "Watchdog",
+        "op1": "true",
+        "op2": "false",
+        "op1type": "bool",
+        "op2type": "bool",
+        "duration": "12",
+        "extend": true,
+        "overrideDelay": false,
+        "units": "s",
+        "reset": "",
+        "bytopic": "all",
+        "topic": "topic",
+        "outputs": 1,
+        "x": 440,
+        "y": 560,
+        "wires": [
+            [
+                "e828adc3fb471272"
+            ]
+        ],
+        "icon": "node-red/watch.svg"
+    },
+    {
+        "id": "9fc0b0a7970a5864",
+        "type": "join",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "status",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "",
+        "count": "26",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "",
+        "reduceFixup": "",
+        "x": 125,
+        "y": 600,
+        "wires": [
+            [
+                "f4c7bea9be5d28b8"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "f4c7bea9be5d28b8",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Writing Monitor",
+        "func": "const statusArray = msg.status;\nmsg.topic = \"writing\";\nmsg.payload = statusArray.includes(\"value written\");\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 600,
+        "wires": [
+            [
+                "18cdaa9577898480"
+            ]
+        ]
+    },
+    {
+        "id": "18cdaa9577898480",
+        "type": "rbe",
+        "z": "f6f2187d.f17ca8",
+        "name": "Watchdog",
+        "func": "rbe",
+        "gap": "",
+        "start": "",
+        "inout": "out",
+        "septopics": false,
+        "property": "payload",
+        "topi": "topic",
+        "x": 440,
+        "y": 600,
+        "wires": [
+            [
+                "e828adc3fb471272"
+            ]
+        ],
+        "icon": "node-red/watch.svg"
+    },
+    {
+        "id": "e828adc3fb471272",
+        "type": "link out",
+        "z": "f6f2187d.f17ca8",
+        "name": "link out 4",
+        "mode": "link",
+        "links": [
+            "8e0e167b38eff67f"
+        ],
+        "x": 555,
+        "y": 580,
+        "wires": [],
+        "icon": "node-red/status.svg"
+    },
+    {
+        "id": "8e0e167b38eff67f",
+        "type": "link in",
+        "z": "f6f2187d.f17ca8",
+        "name": "link in 4",
+        "links": [
+            "e828adc3fb471272"
+        ],
+        "x": 55,
+        "y": 460,
+        "wires": [
+            [
+                "e7274e6953b66447"
+            ]
+        ],
+        "icon": "node-red/status.svg"
+    },
+    {
+        "id": "e7274e6953b66447",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Read/Write Status",
+        "func": "const status = msg.payload;\nconst operation = msg.topic;\nlet alert_list = flow.get(\"Alert_List\") || [];\n\nswitch (operation) {\n    case \"polling\":\n        if (alert_list.includes(\"polling\")) {\n            let i = alert_list.indexOf(\"polling\");\n            alert_list.splice(i, 1);\n            flow.set(\"Alert_List\", alert_list);\n        }\n        if (status) flow.set(\"Read_Status\", true);\n        else flow.set(\"Read_Status\", false);\n        break;\n\n    case \"writing\":\n        if (alert_list.includes(\"writing\")) {\n            let i = alert_list.indexOf(\"writing\");\n            alert_list.splice(i, 1);\n            flow.set(\"Alert_List\", alert_list);\n        }\n        if (status) flow.set(\"Write_Status\", true);\n        else flow.set(\"Write_Status\", false);\n\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "// Reset\nflow.set(\"Write_Status\", false);\nflow.set(\"Read_Status\", false);",
+        "finalize": "",
+        "libs": [],
+        "x": 190,
+        "y": 460,
+        "wires": [
+            [
+                "8e0ec484242ab4e6"
+            ]
+        ],
+        "icon": "font-awesome/fa-check-square"
+    },
+    {
+        "id": "c3951f4f69b46c7a",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Refresh",
+        "func": "msg = [\n    {\n        topic: \"OPCUA_Status\",\n        payload: flow.get(\"OPCUA_Status\")\n    },\n    {\n        topic: \"Modbus_Status\",\n        payload: flow.get(\"Modbus_Status\")\n    },\n    {\n        topic: \"writing\",\n        payload: flow.get(\"Write_Status\")\n    },\n    {\n        topic: \"polling\",\n        payload: flow.get(\"Read_Status\")\n    }\n];\n\nreturn [msg];",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 220,
+        "y": 500,
+        "wires": [
+            [
+                "8e0ec484242ab4e6"
+            ]
+        ],
+        "icon": "font-awesome/fa-refresh"
+    },
+    {
+        "id": "9081d44f24ffa835",
+        "type": "ui-event",
+        "z": "f6f2187d.f17ca8",
+        "ui": "1ad790200119f6c9",
+        "name": "",
+        "x": 55,
+        "y": 500,
+        "wires": [
+            [
+                "01567d2a2541df07"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "8e0ec484242ab4e6",
+        "type": "ui-template",
+        "z": "f6f2187d.f17ca8",
+        "group": "0356c747f1a2f24e",
+        "page": "",
+        "ui": "",
+        "name": "Connection Display",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "head": "",
+        "format": "<template>\n    <div>\n        <p>\n            Modbus TCP Client:\n            <span :style=\"{ color: modbusStatus ? 'green' : 'red' }\">\n        <strong>{{ modbusStatus ? 'Active' : 'Error'}}</strong>\n      </span>\n            <span v-if=\"modbusStatus\">\n        |\n        <span :style=\"{ color: readStatus ? 'green' : 'red' }\">\n          <strong>{{ readStatus ? 'Reading' : 'Error' }}</strong>\n        </span>\n            </span>\n\n        <p>OPC UA Client:\n            <span :style=\"{ color: opcuaStatus ? 'green' : 'red' }\">\n        <strong>{{ opcuaStatus ? 'Active' : 'Error'}}</strong>\n      </span>\n            <span v-if=\"opcuaStatus && readStatus\">\n        |\n        <span :style=\"{ color: writeStatus ? 'green' : 'red' }\">\n          <strong>{{ writeStatus ? 'Writing' : 'Error'}}</strong>\n        </span>\n            </span>\n        </p>\n    </div>\n</template>\n\n<script>\n    export default {\n  data() {\n    return {\n      modbusStatus: null,\n      opcuaStatus: null,\n      writeStatus: null,\n      readStatus: null\n    };\n  },\n  watch: {\n    msg: {\n      immediate: true,\n      handler(newMsg) {\n        switch (newMsg.topic) {\n          case \"Modbus_Status\":\n            this.modbusStatus = newMsg.payload;\n            break;\n          case \"OPCUA_Status\":\n            this.opcuaStatus = newMsg.payload;\n            break;\n          case \"polling\":\n            this.readStatus = newMsg.payload;\n            break;\n          case \"writing\":\n            this.writeStatus = newMsg.payload;\n        }\n      }\n    }\n  }\n};\n</script>",
+        "storeOutMessages": true,
+        "passthru": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 430,
+        "y": 440,
+        "wires": [
+            [
+                "930cdf383f1db7f6"
+            ]
+        ]
+    },
+    {
+        "id": "930cdf383f1db7f6",
+        "type": "trigger",
+        "z": "f6f2187d.f17ca8",
+        "name": "Timeout",
+        "op1": "",
+        "op2": "",
+        "op1type": "nul",
+        "op2type": "pay",
+        "duration": "30",
+        "extend": false,
+        "overrideDelay": false,
+        "units": "s",
+        "reset": "true",
+        "bytopic": "topic",
+        "topic": "topic",
+        "outputs": 1,
+        "x": 620,
+        "y": 440,
+        "wires": [
+            [
+                "5341cf5128b22cee"
+            ]
+        ],
+        "icon": "font-awesome/fa-clock-o"
+    },
+    {
+        "id": "def34571a6425e40",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Spam Wall",
+        "func": "// If no error is detected, skip message\nif (msg.payload) return;\n\n// Prevents redundant alerts\nif (msg.topic === \"polling\" && !flow.get(\"Modbus_Status\"))\n    return null;\nif (msg.topic === \"writing\" && (!flow.get(\"OPCUA_Status\") || !flow.get(\"Read_Status\")))\n    return null;\n\n// Check for full crash\nif (!flow.get(\"OPCUA_Status\") && !flow.get(\"Modbus_Status\"))\n    msg.topic = \"Full_Operation_Error\";\n\n// Check for spam - Only alert if it's a new error\nlet alert_list = flow.get(\"Alert_List\");\n\nif (!alert_list.includes(msg.topic)) {\n    alert_list.push(msg.topic);\n    flow.set(\"Alert_List\", alert_list);\n    return msg;\n}\n\nreturn;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "flow.set(\"Alert_List\", []);",
+        "finalize": "",
+        "libs": [],
+        "x": 190,
+        "y": 700,
+        "wires": [
+            [
+                "7c535823d0bab3a6"
+            ]
+        ],
+        "icon": "font-awesome/fa-flag"
+    },
+    {
+        "id": "7c535823d0bab3a6",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Write Log",
+        "func": "let dcn = env.get(\"DCN_ID\") || \"unknown\";\nlet error = \"unknown\";\nlet action_msg = \"Please check connectivity and restart the DCN if necessary.\";\n\n// Checks error type\nswitch (msg.topic) {\n    case \"OPCUA_Status\":\n        error = \"OPC UA Server Communication\";\n        break;\n    case \"Modbus_Status\":\n        error = \"Modbus TCP Server Communication\";\n        break;\n    case \"polling\":\n        error = \"Modbus Read Operation\";\n        break;\n    case \"writing\":\n        error = \"OPC UA Write Operation\";\n        break;\n    case \"Full_Operation_Error\":\n        action_msg = action_msg + \"\\n\\n After fixing the issue, be sure to redeploy the flows.\";\n        if ((Date.now() - context.get(\"Init_Time\")) / 60000 > 15)\n            error = \"Complete Node\"\n        else\n            error = \"Node Initialization\";\n        break;\n    default:\n        error = \"Unknown\";\n}\n\n\n\n// Skips warning if no information can be provided\nif (error === \"unknown\" && dcn === \"unknown\") return null;\n\n// Email structure\nmsg.topic = `[ALERT] Error Detected on ${dcn}`;\nmsg.payload = `\n🚨 *ERROR* 🚨\n\nControl Node: ${dcn}\nIssue: ${error} Failure Detected!\nTimestamp: ${new Date().toLocaleString()}\n\nAction: ${action_msg}\n\n———————————————————————————————————————————————\nAutomated alert from Node-RED Monitoring System\n`;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "context.set(\"Init_Time\", Date.now());",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 700,
+        "wires": [
+            [
+                "b521f15d09c88b7e"
+            ]
+        ],
+        "icon": "font-awesome/fa-file-text"
+    },
+    {
+        "id": "5341cf5128b22cee",
+        "type": "link out",
+        "z": "f6f2187d.f17ca8",
+        "name": "link out 5",
+        "mode": "link",
+        "links": [
+            "7134ddc81d017d31"
+        ],
+        "x": 735,
+        "y": 440,
+        "wires": [],
+        "icon": "node-red/alert.svg"
+    },
+    {
+        "id": "7134ddc81d017d31",
+        "type": "link in",
+        "z": "f6f2187d.f17ca8",
+        "name": "link in 5",
+        "links": [
+            "5341cf5128b22cee"
+        ],
+        "x": 55,
+        "y": 700,
+        "wires": [
+            [
+                "def34571a6425e40"
+            ]
+        ],
+        "icon": "node-red/alert.svg"
+    },
+    {
+        "id": "b521f15d09c88b7e",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "Error Log",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 520,
+        "y": 700,
+        "wires": [],
+        "icon": "font-awesome/fa-bell"
+    },
+    {
+        "id": "01567d2a2541df07",
+        "type": "delay",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "pauseType": "delay",
+        "timeout": "750",
+        "timeoutUnits": "milliseconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 115,
+        "y": 500,
+        "wires": [
+            [
+                "c3951f4f69b46c7a"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "21105053c89514ee",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "Nodeset 3: Show Warning Upon Failure Detection",
+        "info": "",
+        "x": 220,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "de1dcf1c7d06a823",
+        "type": "trigger",
+        "z": "f6f2187d.f17ca8",
+        "name": "Reset",
+        "op1": "",
+        "op2": "[]",
+        "op1type": "nul",
+        "op2type": "json",
+        "duration": "5",
+        "extend": true,
+        "overrideDelay": false,
+        "units": "s",
+        "reset": "",
+        "bytopic": "all",
+        "topic": "topic",
+        "outputs": 1,
+        "x": 530,
+        "y": 280,
+        "wires": [
+            [
+                "58b9eff72e8be032"
+            ]
+        ],
+        "icon": "font-awesome/fa-refresh"
+    }
+]

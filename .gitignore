@@ -1,0 +1,28 @@
+# Python
+.venv/
+env/
+**/env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime & Data
+.env
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.log
+deploy.log
+/OCF/data/
+/Field/faults.json
+ACP/incidents/
+
+# Build / IDE / Agent runtime
+build/
+**/build/
+.vscode/
+.idea/
+.DS_Store
+/.agents/
+/skills/

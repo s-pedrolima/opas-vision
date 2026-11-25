@@ -18,9 +18,11 @@ import asyncio
 import json
 import re
 import sqlite3
+import statistics
 import subprocess
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +68,116 @@ STATE_NAMES = {
     4: "RELEASING_PIECE",
 }
 
+# Pares (nome, coluna_atuador, coluna_sensor_fim_de_curso, estado_fsm) usados
+# para medir o tempo de curso individual de cada atuador linear a partir da
+# tabela `telemetry` (gravada on-change em milissegundos pelo Historian).
+ACTUATOR_STROKES: list[tuple[str, str, str, int]] = [
+    ("Base_Up -> Base_Up_Sensor", "base_up", "base_up_sensor", 1),
+    ("Shield_Down -> Shield_Down_Sensor", "shield_down", "shield_down_sensor", 1),
+    ("Shield_Up -> Shield_Up_Sensor", "shield_up", "shield_up_sensor", 3),
+    ("Base_Down -> Base_Down_Sensor", "base_down", "base_down_sensor", 3),
+]
+
+# Janela recente (últimos N ciclos/cursos) para detectar degradação recente
+# sem diluição na média global histórica.
+RECENT_WINDOW = 3
+
+# Gap máximo (s) entre linhas consecutivas de telemetria dentro da mesma sessão
+# do Historian (heartbeat = 10 s). Gaps maiores indicam reinício de sessão.
+SESSION_GAP_SEC = 30.0
+
+
+def _now_utc_iso() -> str:
+    """Retorna o relógio atual do servidor em ISO-8601 UTC (LLMs não têm relógio interno)."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _compute_last_telemetry_age_sec(conn: sqlite3.Connection, now_epoch: float) -> float | None:
+    """Segundos decorridos desde a última amostra gravada na tabela `telemetry`."""
+    row = conn.execute("SELECT MAX(ts_epoch) FROM telemetry;").fetchone()
+    if row is None or row[0] is None:
+        return None
+    return round(max(0.0, now_epoch - float(row[0])), 1)
+
+
+def _compute_actuator_timings(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """
+    Calcula o tempo de curso individual (atuador ON -> sensor fim de curso ON)
+    a partir da tabela `telemetry` do Historian.
+
+    Permite distinguir se a lentidão ocorre em um único mecanismo (ex.: só o
+    escudo) ou em todos os movimentos pneumáticos simultaneamente.
+    """
+    rows = conn.execute(
+        """
+        SELECT ts_epoch,
+               base_up, base_up_sensor,
+               shield_down, shield_down_sensor,
+               shield_up, shield_up_sensor,
+               base_down, base_down_sensor
+          FROM telemetry
+         ORDER BY id ASC;
+        """
+    ).fetchall()
+
+    # Estado de rastreamento por par de curso
+    open_start: dict[str, float | None] = {label: None for label, _, _, _ in ACTUATOR_STROKES}
+    durations: dict[str, list[float]] = {label: [] for label, _, _, _ in ACTUATOR_STROKES}
+    prev_epoch: float | None = None
+
+    for row in rows:
+        ts = float(row["ts_epoch"])
+        # Se houve pausa longa (Historian parado e reiniciado), descarta cursos abertos
+        if prev_epoch is not None and (ts - prev_epoch) > SESSION_GAP_SEC:
+            for label in open_start:
+                open_start[label] = None
+        prev_epoch = ts
+
+        for label, act_col, sens_col, _ in ACTUATOR_STROKES:
+            act_val = int(row[act_col])
+            sens_val = int(row[sens_col])
+            started = open_start[label]
+
+            if started is None:
+                # Início de curso: atuador acionado e sensor de fim de curso ainda em 0
+                if act_val == 1 and sens_val == 0:
+                    open_start[label] = ts
+            else:
+                # IMPORTANTE: checar sensor==1 ANTES de act==0, porque o PLC
+                # desliga o atuador no mesmo scan em que o sensor ativa!
+                if sens_val == 1:
+                    dt = round(ts - started, 2)
+                    if dt > 0:
+                        durations[label].append(dt)
+                    open_start[label] = None
+                elif act_val == 0:
+                    # Comando abortado antes de atingir fim de curso
+                    open_start[label] = None
+
+    results: list[dict[str, Any]] = []
+    for label, _, _, state_code in ACTUATOR_STROKES:
+        vals = durations[label]
+        if not vals:
+            continue
+        baseline = round(statistics.median(vals), 2)
+        recent_vals = vals[-RECENT_WINDOW:]
+        recent = round(statistics.median(recent_vals), 2)
+        delta_pct = round(((recent - baseline) / baseline) * 100.0, 1) if baseline > 0 else 0.0
+        results.append(
+            {
+                "stroke": label,
+                "state": state_code,
+                "samples": len(vals),
+                "baseline_median_sec": baseline,
+                "recent_median_sec": recent,
+                "recent_values_sec": recent_vals,
+                "delta_pct": delta_pct,
+                "min_sec": round(min(vals), 2),
+                "max_sec": round(max(vals), 2),
+            }
+        )
+    return results
+
 
 # ---------------------------------------------------------------------------
 # Tool 1: Leitura ao vivo do servidor OPC UA
@@ -84,6 +196,7 @@ async def _fetch_opcua_snapshot() -> dict[str, Any]:
     state_code = int(data["Machine_State"])
 
     return {
+        "server_time_utc": _now_utc_iso(),
         "dcn_id": DCN_ID,
         "machine_state": state_code,
         "machine_state_name": STATE_NAMES.get(state_code, f"UNKNOWN_{state_code}"),
@@ -100,6 +213,7 @@ def get_live_machine_state() -> dict[str, Any]:
         # Em vez de deixar a exceção quebrar o agente, devolvemos um erro
         # estruturado — isso é uma evidência útil pro diagnóstico (ex.: OCF offline).
         return {
+            "server_time_utc": _now_utc_iso(),
             "error": "Falha ao ler servidor OPC UA",
             "endpoint": OPCUA_ENDPOINT,
             "details": str(exc),
@@ -107,7 +221,7 @@ def get_live_machine_state() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Tool 2: Estatísticas históricas por estado (Historian / SQLite)
+# Tool 2: Estatísticas históricas por estado + tempos por atuador (Historian)
 # ---------------------------------------------------------------------------
 def _open_historian_readonly() -> sqlite3.Connection:
     """Abre o SQLite em modo somente-leitura (segurança: agente não altera histórico)."""
@@ -126,18 +240,24 @@ def _has_close_reason_column(conn: sqlite3.Connection) -> bool:
 
 
 def get_state_statistics() -> dict[str, Any]:
-    """Retorna estatísticas (média, mín, máx, contagem) de duração de cada estado da FSM."""
+    """
+    Retorna estatísticas robustas (mediana de linha de base, mediana recente dos
+    últimos ciclos, desvio percentual, média, mín/máx) de cada estado da FSM,
+    além dos tempos de curso individuais de cada atuador linear.
+    """
     try:
         conn = _open_historian_readonly()
     except Exception as exc:
         return {"error": str(exc)}
 
     try:
+        now_epoch = time.time()
         has_reason = _has_close_reason_column(conn)
         total_telemetry = conn.execute("SELECT COUNT(*) FROM telemetry;").fetchone()[0]
         total_cycles = conn.execute(
             "SELECT COUNT(DISTINCT cycle_id) FROM state_cycles;"
         ).fetchone()[0]
+        last_telemetry_age = _compute_last_telemetry_age_sec(conn, now_epoch)
 
         reason_filter = (
             "AND (close_reason IS NULL OR close_reason = 'transition')"
@@ -156,33 +276,73 @@ def get_state_statistics() -> dict[str, Any]:
             else 0
         )
 
-        rows = conn.execute(
+        # Buscamos todas as durações limpas em ordem cronológica para calcular
+        # tanto a mediana global (imune a outliers como travamentos) quanto a
+        # mediana da janela recente (últimos 3 ciclos).
+        raw_rows = conn.execute(
             f"""
-            SELECT state,
-                   state_name,
-                   COUNT(*)                     AS samples,
-                   ROUND(AVG(duration_sec), 2)  AS avg_sec,
-                   ROUND(MIN(duration_sec), 2)  AS min_sec,
-                   ROUND(MAX(duration_sec), 2)  AS max_sec
+            SELECT state, state_name, duration_sec
               FROM state_cycles
              WHERE duration_sec IS NOT NULL
                {reason_filter}
-             GROUP BY state, state_name
-             ORDER BY state;
+             ORDER BY id ASC;
             """
         ).fetchall()
 
-        per_state = [dict(r) for r in rows]
-        avg_full_cycle = round(sum(item["avg_sec"] for item in per_state), 2) if per_state else 0.0
-        est_pieces_per_hour = round(3600.0 / avg_full_cycle, 1) if avg_full_cycle > 0 else 0.0
+        grouped: dict[int, tuple[str, list[float]]] = {}
+        for r in raw_rows:
+            st = int(r["state"])
+            st_name = str(r["state_name"])
+            if st not in grouped:
+                grouped[st] = (st_name, [])
+            grouped[st][1].append(float(r["duration_sec"]))
+
+        per_state: list[dict[str, Any]] = []
+        for st in sorted(grouped.keys()):
+            st_name, vals = grouped[st]
+            baseline_med = round(statistics.median(vals), 2)
+            recent_vals = [round(v, 2) for v in vals[-RECENT_WINDOW:]]
+            recent_med = round(statistics.median(recent_vals), 2)
+            delta_pct = (
+                round(((recent_med - baseline_med) / baseline_med) * 100.0, 1)
+                if baseline_med > 0
+                else 0.0
+            )
+            per_state.append(
+                {
+                    "state": st,
+                    "state_name": st_name,
+                    "samples": len(vals),
+                    "baseline_median_sec": baseline_med,
+                    "recent_median_sec": recent_med,
+                    "recent_values_sec": recent_vals,
+                    "delta_pct": delta_pct,
+                    "avg_sec": round(sum(vals) / len(vals), 2),
+                    "min_sec": round(min(vals), 2),
+                    "max_sec": round(max(vals), 2),
+                }
+            )
+
+        baseline_cycle = round(sum(s["baseline_median_sec"] for s in per_state), 2) if per_state else 0.0
+        recent_cycle = round(sum(s["recent_median_sec"] for s in per_state), 2) if per_state else 0.0
+        baseline_tph = round(3600.0 / baseline_cycle, 1) if baseline_cycle > 0 else 0.0
+        recent_tph = round(3600.0 / recent_cycle, 1) if recent_cycle > 0 else 0.0
+
+        actuator_timings = _compute_actuator_timings(conn)
 
         return {
+            "server_time_utc": _now_utc_iso(),
+            "last_telemetry_age_sec": last_telemetry_age,
             "total_telemetry_rows": total_telemetry,
             "total_cycles_recorded": total_cycles,
             "excluded_partial_or_shutdown_states": excluded_partial,
-            "estimated_avg_full_cycle_sec": avg_full_cycle,
-            "estimated_throughput_pieces_per_hour": est_pieces_per_hour,
+            "recent_window_size": RECENT_WINDOW,
+            "baseline_full_cycle_sec": baseline_cycle,
+            "baseline_throughput_pieces_per_hour": baseline_tph,
+            "recent_full_cycle_sec": recent_cycle,
+            "recent_throughput_pieces_per_hour": recent_tph,
             "states": per_state,
+            "actuator_timings": actuator_timings,
         }
     finally:
         conn.close()
@@ -192,7 +352,7 @@ def get_state_statistics() -> dict[str, Any]:
 # Tool 3: Transições recentes e estado atualmente em andamento
 # ---------------------------------------------------------------------------
 def get_recent_cycles(limit: int = 10) -> dict[str, Any]:
-    """Retorna as últimas transições de estado, incluindo tempo decorrido se houver estado aberto."""
+    """Retorna as últimas transições de estado, incluindo frescor dos dados e estado aberto."""
     # Mini-guardrail: evita que a LLM peça 100.000 linhas e estoure o contexto
     safe_limit = max(1, min(int(limit), 50))
 
@@ -217,7 +377,10 @@ def get_recent_cycles(limit: int = 10) -> dict[str, Any]:
         ).fetchall()
 
         now_epoch = time.time()
+        last_telemetry_age = _compute_last_telemetry_age_sec(conn, now_epoch)
         transitions = []
+        has_open_state = False
+
         # Reverte para apresentar em ordem cronológica (mais antigo -> mais recente)
         for row in reversed(rows):
             item: dict[str, Any] = {
@@ -234,13 +397,28 @@ def get_recent_cycles(limit: int = 10) -> dict[str, Any]:
             # Se ended_at é None, a máquina AINDA está neste estado — calculamos
             # quanto tempo já se passou para detectar travamentos imediatamente!
             if row["ended_at"] is None:
+                has_open_state = True
                 item["status"] = "IN_PROGRESS"
                 item["elapsed_sec"] = round(now_epoch - row["started_epoch"], 2)
             else:
                 item["status"] = "COMPLETED"
             transitions.append(item)
 
+        # Calcula há quantos segundos ocorreu a última transição registrada
+        last_event_age_sec: float | None = None
+        if rows:
+            newest = rows[0]
+            if newest["ended_at"] is None:
+                last_event_age_sec = round(max(0.0, now_epoch - float(newest["started_epoch"])), 1)
+            elif newest["duration_sec"] is not None:
+                last_end_epoch = float(newest["started_epoch"]) + float(newest["duration_sec"])
+                last_event_age_sec = round(max(0.0, now_epoch - last_end_epoch), 1)
+
         return {
+            "server_time_utc": _now_utc_iso(),
+            "last_telemetry_age_sec": last_telemetry_age,
+            "last_event_age_sec": last_event_age_sec,
+            "has_open_state": has_open_state,
             "returned_count": len(transitions),
             "transitions": transitions,
         }
@@ -342,12 +520,13 @@ def get_docker_status(tail_logs: int = 12) -> dict[str, Any]:
             ]
         )
     except FileNotFoundError:
-        return {"error": "CLI 'docker' não encontrado na máquina."}
+        return {"server_time_utc": _now_utc_iso(), "error": "CLI 'docker' não encontrado na máquina."}
     except subprocess.TimeoutExpired:
-        return {"error": "Timeout ao consultar Docker Swarm."}
+        return {"server_time_utc": _now_utc_iso(), "error": "Timeout ao consultar Docker Swarm."}
 
     if ls_proc.returncode != 0:
         return {
+            "server_time_utc": _now_utc_iso(),
             "error": "Falha ao consultar Docker Swarm",
             "stderr": ls_proc.stderr.strip(),
         }
@@ -355,9 +534,13 @@ def get_docker_status(tail_logs: int = 12) -> dict[str, Any]:
     raw_lines = [line for line in ls_proc.stdout.splitlines() if line.strip()]
     if not raw_lines:
         return {
+            "server_time_utc": _now_utc_iso(),
             "stack": DOCKER_STACK_NAME,
             "status": "NOT_DEPLOYED",
+            "running": False,
+            "active_services_count": 0,
             "services": [],
+            "note": "Nenhum serviço da stack DCN (OpenPLC/Node-RED) está implantado ou em execução no Docker Swarm.",
         }
 
     services_info: list[dict[str, Any]] = []
@@ -407,8 +590,11 @@ def get_docker_status(tail_logs: int = 12) -> dict[str, Any]:
         )
 
     return {
+        "server_time_utc": _now_utc_iso(),
         "stack": DOCKER_STACK_NAME,
         "status": "DEPLOYED",
+        "running": True,
+        "active_services_count": len(services_info),
         "services": services_info,
     }
 
@@ -424,14 +610,18 @@ def _parse_incident_markdown(path: Path) -> dict[str, Any]:
     ts_match = re.search(r"-\s*\*\*Data/Hora:\*\*\s*(.+)$", text, re.MULTILINE)
     trigger_match = re.search(r"-\s*\*\*Gatilho Determinístico:\*\*\s*(.+)$", text, re.MULTILINE)
 
-    # Tenta capturar a seção "### Resumo" ou "**Conclusão:**"; senão usa o início do corpo
+    # Tenta capturar a seção "### Resumo" ou "**Resumo:**"; senão usa o início do corpo
     summary_text = ""
     resumo_match = re.search(r"###\s*Resumo\s*\n+(.+?)(?:\n###|\Z)", text, re.DOTALL)
     if resumo_match:
         summary_text = resumo_match.group(1).strip()
     else:
-        body = text.split("---", 1)[-1].strip()
-        summary_text = body[:450] + ("..." if len(body) > 450 else "")
+        inline_resumo = re.search(r"\*\*Resumo:\*\*\s*(.+)$", text, re.MULTILINE)
+        if inline_resumo:
+            summary_text = inline_resumo.group(1).strip()
+        else:
+            body = text.split("---", 1)[-1].strip()
+            summary_text = body[:450] + ("..." if len(body) > 450 else "")
 
     return {
         "file": path.name,
@@ -451,12 +641,13 @@ def get_recent_incidents(limit: int = 5) -> dict[str, Any]:
     safe_limit = max(1, min(int(limit), 15))
 
     if not INCIDENTS_DIR.exists():
-        return {"total_incidents_stored": 0, "incidents": []}
+        return {"server_time_utc": _now_utc_iso(), "total_incidents_stored": 0, "incidents": []}
 
     files = sorted(INCIDENTS_DIR.glob("*.md"))
     selected = files[-safe_limit:]
 
     return {
+        "server_time_utc": _now_utc_iso(),
         "total_incidents_stored": len(files),
         "returned_count": len(selected),
         "incidents": [_parse_incident_markdown(f) for f in selected],
@@ -491,10 +682,12 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_state_statistics",
             "description": (
-                "Consulta o Historian (SQLite) e retorna estatísticas históricas "
-                "(contagem, média, mínimo e máximo de duração em segundos) de cada estado "
-                "da FSM da Welding Station, além do tempo médio de ciclo completo e "
-                "vazão estimada (peças/hora). Use para linha de base, OEE e gargalos."
+                "Consulta o Historian (SQLite) e retorna: (1) estatísticas por estado da FSM "
+                "com mediana histórica (baseline_median_sec), mediana recente dos últimos 3 ciclos "
+                "(recent_median_sec), desvio percentual (delta_pct), média, mín/máx e throughput "
+                "baseline vs. recente; e (2) `actuator_timings` com o tempo de curso individual de "
+                "cada atuador linear (Base_Up, Shield_Down, Shield_Up, Base_Down). Use para linha "
+                "de base, gargalos e distinguir falhas locais de degradação compartilhada."
             ),
             "parameters": {
                 "type": "object",
@@ -509,9 +702,10 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "name": "get_recent_cycles",
             "description": (
                 "Consulta o Historian (SQLite) e retorna as transições de estado mais "
-                "recentes em ordem cronológica, incluindo se há algum estado EM ANDAMENTO "
-                "e há quantos segundos (elapsed_sec) ele está aberto. Use para detectar "
-                "travamentos, ciclos lentos recentes ou degradação progressiva."
+                "recentes em ordem cronológica, incluindo relógio atual (`server_time_utc`), "
+                "idade da última telemetria/transição (`last_telemetry_age_sec`, `last_event_age_sec`), "
+                "se há algum estado EM ANDAMENTO (`has_open_state`) e há quantos segundos (`elapsed_sec`) "
+                "ele está aberto. Use para detectar travamentos, frescor dos dados ou ciclos lentos."
             ),
             "parameters": {
                 "type": "object",
@@ -548,10 +742,9 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "name": "get_docker_status",
             "description": (
                 "Inspeciona os serviços da stack DCN (`dcn-ws`: OpenPLC e Node-RED) no "
-                "Docker Swarm, retornando réplicas ativas, imagem/versão, histórico de "
-                "restarts/falhas de containers e as últimas linhas de log. Use quando "
-                "suspeitar de queda de container, erro de comunicação Modbus/OPC UA ou "
-                "impacto de rolling update."
+                "Docker Swarm, retornando se a stack está ativa (`running`), réplicas, "
+                "imagem/versão, histórico de restarts/falhas e últimas linhas de log. "
+                "Use para verificar se a máquina/DCN está no ar ou investigar falhas de container."
             ),
             "parameters": {
                 "type": "object",
@@ -635,7 +828,7 @@ if __name__ == "__main__":
         ("get_recent_cycles", {"limit": 6}),
         ("read_plc_logic", {}),
         ("get_docker_status", {"tail_logs": 5}),
-        ("get_recent_incidents", {"limit": 3}),
+        ("get_recent_incidents", {"limit": 5}),
     ]
 
     for tool_name, tool_args in tests:

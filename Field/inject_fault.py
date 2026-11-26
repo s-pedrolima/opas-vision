@@ -55,66 +55,66 @@ def save_profile(profile: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Injetor de Falhas da Welding Station (escreve Field/faults.json)"
+        description="Welding Station Fault Injector (writes Field/faults.json)"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # 1. sensor-stuck <sensor> <true|false>
     p_sensor = subparsers.add_parser(
         "sensor-stuck",
-        help="Trava um sensor em True ou False (ex.: sensor-stuck shield_down false)",
+        help="Lock a sensor to true or false (e.g. sensor-stuck shield_down false)",
     )
-    p_sensor.add_argument("sensor", choices=VALID_SENSORS, help="Sensor a travar")
+    p_sensor.add_argument("sensor", choices=VALID_SENSORS, help="Sensor to override")
     p_sensor.add_argument(
         "value",
         choices=["true", "false"],
-        help="Valor lógico travado (true ou false)",
+        help="Stuck boolean value (true or false)",
     )
 
     # 2. pneumatic-leak [--factor 0.6] [--target base|shield|both]
     p_leak = subparsers.add_parser(
         "pneumatic-leak",
-        help="Simula perda de pressão pneumática desacelerando atuador(es)",
+        help="Simulate pneumatic pressure loss by slowing actuator(s)",
     )
     p_leak.add_argument(
         "--factor",
         type=float,
         default=0.6,
-        help="Fator de velocidade entre 0.1 e 1.0 (padrão: 0.6 -> ~8.5s em vez de 5s)",
+        help="Speed factor between 0.1 and 1.0 (default: 0.6 -> ~8.5s instead of 5s)",
     )
     p_leak.add_argument(
         "--target",
         choices=["base", "shield", "both"],
         default="base",
-        help="Qual atuador sofre degradação (padrão: base)",
+        help="Which actuator is degraded (default: base)",
     )
 
     # 3. conveyor-jam
     subparsers.add_parser(
         "conveyor-jam",
-        help="Trava mecanicamente a esteira mesmo quando o PLC envia Conveyor_Run=True",
+        help="Mechanically jam the conveyor even when PLC asserts Conveyor_Run=True",
     )
 
     # 4. clear
-    subparsers.add_parser("clear", help="Remove todas as falhas ativas")
+    subparsers.add_parser("clear", help="Remove all active faults")
 
     # 5. status
-    subparsers.add_parser("status", help="Exibe o perfil de falhas ativo")
+    subparsers.add_parser("status", help="Show the currently active fault profile")
 
     args = parser.parse_args()
 
     if args.command == "status":
         if not FAULTS_FILE.exists():
-            print("✅ Nenhuma falha ativa (operação normal).")
+            print("[OK] No active faults (normal operation).")
         else:
-            print(f"⚠️  Perfil ativo em {FAULTS_FILE.name}:")
+            print(f"[WARN] Active profile in {FAULTS_FILE.name}:")
             print(FAULTS_FILE.read_text(encoding="utf-8"))
         return
 
     if args.command == "clear":
         if FAULTS_FILE.exists():
             FAULTS_FILE.unlink()
-        print("✅ Todas as falhas removidas — operação normal restaurada.")
+        print("[OK] All faults cleared — normal operation restored.")
         return
 
     profile = load_profile()
@@ -123,7 +123,7 @@ def main() -> None:
         stuck_val = args.value == "true"
         profile["sensor_overrides"][args.sensor] = stuck_val
         save_profile(profile)
-        print(f"🚨 Falha injetada: sensor '{args.sensor}' travado em {stuck_val}.")
+        print(f"[FAULT] Injected: sensor '{args.sensor}' stuck at {stuck_val}.")
 
     elif args.command == "pneumatic-leak":
         factor = max(0.1, min(args.factor, 1.0))
@@ -133,14 +133,14 @@ def main() -> None:
             profile["shield_speed_factor"] = factor
         save_profile(profile)
         print(
-            f"🚨 Falha injetada: degradação pneumática ({args.target}) "
-            f"com velocidade em {factor * 100:.0f}%."
+            f"[FAULT] Injected: pneumatic degradation ({args.target}) "
+            f"at {factor * 100:.0f}% nominal speed."
         )
 
     elif args.command == "conveyor-jam":
         profile["conveyor_jam"] = True
         save_profile(profile)
-        print("🚨 Falha injetada: esteira mecanicamente travada (conveyor_jam=True).")
+        print("[FAULT] Injected: conveyor mechanically jammed (conveyor_jam=True).")
 
 
 if __name__ == "__main__":

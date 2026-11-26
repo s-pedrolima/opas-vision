@@ -261,9 +261,9 @@ def evaluate_state_timeouts(conn: sqlite3.Connection, now_epoch: float) -> list[
                     raise_threshold=threshold,
                     clear_threshold=clear_th,
                     summary=(
-                        f"TIMEOUT detectado no Ciclo #{row['cycle_id']} — "
-                        f"Estado {state} ({state_name}) aberto há {elapsed:.1f}s "
-                        f"(limite: {threshold:.0f}s)"
+                        f"STATE TIMEOUT in Cycle #{row['cycle_id']} — "
+                        f"State {state} ({state_name}) open for {elapsed:.1f}s "
+                        f"(limit: {threshold:.0f}s)"
                     ),
                     prompt=(
                         f"EVENTO DO WATCHER (state_timeout): O Estado {state} ({state_name}) "
@@ -286,7 +286,7 @@ def evaluate_state_timeouts(conn: sqlite3.Connection, now_epoch: float) -> list[
                     metric=0.0,
                     raise_threshold=threshold,
                     clear_threshold=clear_th,
-                    summary=f"Estado {state} operando sem travamento.",
+                    summary=f"State {state} operating within timeout limits.",
                     prompt="",
                     allow_escalation=False,
                     off_delay_sec=STATE_TIMEOUT_OFF_DELAY_SEC,
@@ -341,9 +341,9 @@ def evaluate_slow_degradation(conn: sqlite3.Connection) -> list[AlarmEvaluation]
                 raise_threshold=raise_threshold,
                 clear_threshold=clear_threshold,
                 summary=(
-                    f"DEGRADAÇÃO SUSTENTADA no Estado {state} ({state_name}): "
-                    f"mediana dos últimos {DEGRADATION_WINDOW} ciclos = {recent_median:.2f}s "
-                    f"(valores: {durations}, nominal ~{DEGRADATION_BASELINE_SEC:.1f}s)"
+                    f"SUSTAINED DEGRADATION in State {state} ({state_name}): "
+                    f"last {DEGRADATION_WINDOW}-cycle median = {recent_median:.2f}s "
+                    f"(values: {durations}, nominal ~{DEGRADATION_BASELINE_SEC:.1f}s)"
                 ),
                 prompt=(
                     f"EVENTO PREDITIVO DO WATCHER (slow_degradation): A mediana das "
@@ -381,8 +381,8 @@ def evaluate_stale_telemetry(conn: sqlite3.Connection, now_epoch: float) -> list
             raise_threshold=STALE_TELEMETRY_RAISE_SEC,
             clear_threshold=STALE_TELEMETRY_CLEAR_SEC,
             summary=(
-                f"TELEMETRIA CONGELADA: última amostra no Historian foi há {age_sec:.1f}s "
-                f"(em {row['ts']}, limite: {STALE_TELEMETRY_RAISE_SEC:.0f}s)"
+                f"STALE TELEMETRY: last Historian sample was {age_sec:.1f}s ago "
+                f"(at {row['ts']}, limit: {STALE_TELEMETRY_RAISE_SEC:.0f}s)"
             ),
             prompt=(
                 f"EVENTO DO WATCHER (stale_telemetry): O Historian não registra nenhuma "
@@ -414,18 +414,18 @@ def save_incident_report(
     report_path = INCIDENTS_DIR / f"{stamp}_{suffix}.md"
 
     event_label = (
-        f"ESCALAÇÃO #{transition.escalation_count} "
-        f"(piora de {transition.previous_metric:.2f}s -> {ev.metric:.2f}s)"
+        f"ESCALATED #{transition.escalation_count} "
+        f"({transition.previous_metric:.2f}s -> {ev.metric:.2f}s)"
         if transition.action == "ESCALATED" and transition.previous_metric is not None
-        else "NOVO ALARME (RAISED)"
+        else "RAISED"
     )
 
     content = (
-        f"# Relatório de Incidente — {ev.kind}\n\n"
-        f"- **Data/Hora:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"- **Canal de Alarme:** `{ev.alarm_id}` ({event_label})\n"
-        f"- **Modelo LLM:** `{model}`\n"
-        f"- **Gatilho Determinístico:** {ev.summary}\n\n"
+        f"# Incident Report — {ev.kind}\n\n"
+        f"- **Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"- **Alarm Channel:** `{ev.alarm_id}` ({event_label})\n"
+        f"- **LLM Model:** `{model}`\n"
+        f"- **Deterministic Trigger:** {ev.summary}\n\n"
         f"---\n\n"
         f"{diagnosis}\n"
     )
@@ -445,9 +445,9 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
     raise_deg = DEGRADATION_BASELINE_SEC * DEGRADATION_RAISE_FACTOR
     clear_deg = DEGRADATION_BASELINE_SEC * DEGRADATION_CLEAR_FACTOR
 
-    logging.info("Watcher ACP iniciado (ISA-18.2 Stateful) | modo=%s | banco=%s", "DRY-RUN" if dry_run else model, DB_PATH)
+    logging.info("ACP Watcher started (ISA-18.2 Stateful) | mode=%s | db=%s", "DRY-RUN" if dry_run else model, DB_PATH)
     logging.info(
-        "Limiares: timeouts=%s (off-delay=%.0fs) | degradação RAISE>%.2fs / CLEAR<=%.2fs (escalação +%.0f%%) | telemetria RAISE>%.0fs / CLEAR<=%.0fs",
+        "Thresholds: timeouts=%s (off-delay=%.0fs) | degradation RAISE>%.2fs / CLEAR<=%.2fs (escalation +%.0f%%) | telemetry RAISE>%.0fs / CLEAR<=%.0fs",
         STATE_TIMEOUT_SEC,
         STATE_TIMEOUT_OFF_DELAY_SEC,
         raise_deg,
@@ -466,7 +466,7 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
     while True:
         conn = _open_db_readonly()
         if conn is None:
-            logging.info("Aguardando criação do banco %s...", DB_PATH)
+            logging.info("Waiting for Historian database at %s...", DB_PATH)
             time.sleep(CHECK_INTERVAL_SEC)
             continue
 
@@ -496,7 +496,7 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
 
             if transition.action == "RESOLVED":
                 logging.info(
-                    "✅ ALARME NORMALIZADO [%s]: métrica=%.2fs (<= %.2fs) | duração ativo=%.1fs",
+                    "[RESOLVED] Alarm cleared [%s]: metric=%.2fs (<= %.2fs) | active_duration=%.1fs",
                     ev.alarm_id,
                     ev.metric,
                     ev.clear_threshold,
@@ -508,7 +508,7 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
             prompt_to_send = ev.prompt
             if transition.action == "ESCALATED":
                 logging.warning(
-                    "🔺 ESCALAÇÃO #%d [%s] (%.2fs -> %.2fs): %s",
+                    "[ESCALATED #%d] [%s] (%.2fs -> %.2fs): %s",
                     transition.escalation_count,
                     ev.alarm_id,
                     transition.previous_metric or 0.0,
@@ -522,13 +522,13 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
                     f"{ev.prompt}"
                 )
             else:
-                logging.warning("🚨 ALARME ATIVO [%s]: %s", ev.alarm_id, ev.summary)
+                logging.warning("[ALARM RAISED] [%s]: %s", ev.alarm_id, ev.summary)
 
             if dry_run:
-                logging.info("[DRY-RUN] Prompt que seria enviado ao agente:\n%s", prompt_to_send)
+                logging.info("[DRY-RUN] Prompt that would be sent to agent:\n%s", prompt_to_send)
                 continue
 
-            logging.info("🤖 Acionando AI Agent (%s) para diagnóstico...", model)
+            logging.info("Triggering AI Agent (%s) for root-cause diagnosis...", model)
             # Cada incidente começa com uma conversa limpa (evita contaminar com incidentes antigos)
             messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
             diagnosis = run_agent_turn(
@@ -542,11 +542,11 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
 
             report_path = save_incident_report(transition, model, diagnosis)
             print(f"\n{'=' * 72}")
-            print(f"DIAGNÓSTICO AUTOMÁTICO ({ev.kind} — {transition.action})")
+            print(f"AUTONOMOUS DIAGNOSIS ({ev.kind} — {transition.action})")
             print("=" * 72)
             print(diagnosis)
             print("=" * 72)
-            logging.info("📝 Relatório salvo em %s", report_path)
+            logging.info("Incident report saved to %s", report_path)
 
         time.sleep(CHECK_INTERVAL_SEC)
 
@@ -557,7 +557,7 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
 def _run_alarm_self_test() -> None:
     mgr = AlarmManager(escalation_factor=1.30, escalation_min_interval=60.0)
 
-    print("1) Testando slow_degradation (histerese + anti-flooding + escalação):")
+    print("1) Testing slow_degradation (hysteresis + anti-flooding + escalation):")
 
     def make_deg(metric: float) -> AlarmEvaluation:
         return AlarmEvaluation(
@@ -566,7 +566,7 @@ def _run_alarm_self_test() -> None:
             metric=metric,
             raise_threshold=6.75,
             clear_threshold=5.75,
-            summary=f"mediana={metric:.2f}s",
+            summary=f"median={metric:.2f}s",
             prompt="test",
             allow_escalation=True,
         )
@@ -589,11 +589,11 @@ def _run_alarm_self_test() -> None:
     for t, metric, expected in deg_sequence:
         tr = mgr.process(make_deg(metric), now_epoch=t)
         assert tr.action == expected, (
-            f"Falha deg em t={t}s, metric={metric}: esperado {expected}, obtido {tr.action}"
+            f"Degradation test failed at t={t}s, metric={metric}: expected {expected}, got {tr.action}"
         )
-        print(f"  t={t:5.1f}s | metric={metric:5.2f}s -> {tr.action:<10} (OK)")
+        print(f"  t={t:5.1f}s | metric={metric:5.2f}s -> {tr.action:<10} (PASS)")
 
-    print("\n2) Testando state_timeout (off-delay anti-chattering de 45s):")
+    print("\n2) Testing state_timeout (45s anti-chattering off-delay):")
 
     def make_to(elapsed: float) -> AlarmEvaluation:
         return AlarmEvaluation(
@@ -622,11 +622,11 @@ def _run_alarm_self_test() -> None:
     for t, elapsed, expected in to_sequence:
         tr = mgr.process(make_to(elapsed), now_epoch=t)
         assert tr.action == expected, (
-            f"Falha timeout em t={t}s, elapsed={elapsed}: esperado {expected}, obtido {tr.action}"
+            f"Timeout test failed at t={t}s, elapsed={elapsed}: expected {expected}, got {tr.action}"
         )
-        print(f"  t={t:5.1f}s | elapsed={elapsed:5.1f}s -> {tr.action:<10} (OK)")
+        print(f"  t={t:5.1f}s | elapsed={elapsed:5.1f}s -> {tr.action:<10} (PASS)")
 
-    print("\n✅ Todos os 20 cenários de AlarmManager (histerese + off-delay + escalação) passaram!")
+    print("\nAll 20 AlarmManager scenarios (hysteresis + off-delay + escalation) passed.")
 
 
 if __name__ == "__main__":
@@ -636,18 +636,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Detecta anomalias sem chamar a API da LLM (ótimo para testar limiares)",
+        help="Detect anomalies without calling the LLM API (useful for testing thresholds)",
     )
     parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
-        help="Exibe o JSON completo retornado pelas tools do agente",
+        help="Print full JSON returned by agent tools",
     )
     parser.add_argument(
         "--test-alarms",
         action="store_true",
-        help="Executa o self-test unitário do AlarmManager (sem banco e sem LLM)",
+        help="Run AlarmManager unit self-test (no database or LLM required)",
     )
     args = parser.parse_args()
 
@@ -662,4 +662,4 @@ if __name__ == "__main__":
         try:
             run_watcher(dry_run=args.dry_run, verbose=args.verbose)
         except KeyboardInterrupt:
-            print("\nWatcher ACP encerrado.")
+            print("\nACP Watcher stopped.")

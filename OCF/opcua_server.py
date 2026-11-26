@@ -67,7 +67,7 @@ async def build_server() -> tuple[Server, dict[str, object]]:
     server.set_security_policy([ua.SecurityPolicyType.NoSecurity])
 
     # 1. Registra o namespace customizado.
-    ns_idx = await server.register_namespace(NAMESPACE_URI) # ns_idx = 2 (primeiro registro)
+    ns_idx = await server.register_namespace(NAMESPACE_URI)  # ns_idx = 2 (primeiro registro)
 
     # 2. Cria uma pasta dentro do nó raiz `Objects`.
     objects_node = server.nodes.objects
@@ -109,9 +109,9 @@ async def main() -> None:
 
     server, nodes = await build_server()
 
-    logging.info("Servidor OPC UA pronto em %s", ENDPOINT)
-    logging.info("Namespace registrado: ns=2 (%s)", NAMESPACE_URI)
-    logging.info("%d variáveis criadas sob Objects/%s", len(nodes), DCN_ID)
+    logging.info("OPC UA server ready at %s", ENDPOINT)
+    logging.info("Namespace registered: ns=2 (%s)", NAMESPACE_URI)
+    logging.info("%d variables created under Objects/%s", len(nodes), DCN_ID)
 
     # O context manager `async with server:` inicia o servidor na porta 4840
     # e garante encerramento limpo ao pressionar Ctrl+C.
@@ -139,4 +139,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nServidor OPC UA encerrado.")
+        print("\nOPC UA server stopped.")

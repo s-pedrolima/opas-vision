@@ -9,11 +9,11 @@ TCP_IP = 'localhost'
 # Arquivo compartilhado com `Field/inject_fault.py` para injeção de falhas ao vivo
 FAULTS_FILE = Path(__file__).resolve().parent / "faults.json"
 
-# Simulation Settings --------------------------------------------------------
-REAL_MOTOR_SPEED = 5  # Real speed [cm/s]
-TIME_SKIP = 0.25      # Update time per 1/2 cycle [s]
-MOTOR_SPEED = REAL_MOTOR_SPEED * (2 * TIME_SKIP)  # Simulated speed [cm/loop]
-MACHINE_X_POS = 50    # Machine X position on conveyor [cm]
+# Configurações da Simulação -------------------------------------------------
+REAL_MOTOR_SPEED = 5  # Velocidade real [cm/s]
+TIME_SKIP = 0.25      # Tempo de atualização por 1/2 ciclo [s]
+MOTOR_SPEED = REAL_MOTOR_SPEED * (2 * TIME_SKIP)  # Velocidade simulada [cm/loop]
+MACHINE_X_POS = 50    # Posição X da estação na esteira [cm]
 
 # Limites mecânicos (batentes físicos) da Base e do Escudo
 BASE_Y_MIN = 0.0
@@ -24,14 +24,14 @@ SHIELD_Y_MAX = 50.0
 NOMINAL_BASE_SPEED = 2.0
 NOMINAL_SHIELD_SPEED = 2.0
 
-# PLC variable addresses -----------------------------------------------------
-PLC_COILS_START = 0     # Coils 0-6: PLC to Python commands
-SENSOR_COILS_START = 7  # Coils 7-11: position sensors Python -> PLC
-RESET_COIL = 12         # Coil 12: Resets PLC coils and registers
+# Endereços de variáveis do PLC ----------------------------------------------
+PLC_COILS_START = 0     # Coils 0-6: comandos PLC -> Python
+SENSOR_COILS_START = 7  # Coils 7-11: sensores de posição Python -> PLC
+RESET_COIL = 12         # Coil 12: reseta coils e registradores do PLC
 
-# Coils mapping --------------------------------------------------------------
+# Mapeamento das Coils -------------------------------------------------------
 #
-# ** Command Coils (PLC -> Python) **
+# ** Coils de Comando (PLC -> Python) **
 # coil0: Conveyor_Run
 # coil1: Base_Up
 # coil2: Base_Rotate
@@ -40,7 +40,7 @@ RESET_COIL = 12         # Coil 12: Resets PLC coils and registers
 # coil5: Shield_Up
 # coil6: Burner
 #
-# ** Sensor Coils (Python -> PLC) **
+# ** Coils de Sensores (Python -> PLC) **
 # coil7: Piece_Pos_Sensor
 # coil8: Base_Up_Sensor
 # coil9: Base_Down_Sensor
@@ -48,7 +48,7 @@ RESET_COIL = 12         # Coil 12: Resets PLC coils and registers
 # coil11: Shield_Up_Sensor
 
 
-# Fault Injection Loader -----------------------------------------------------
+# Carregador Dinâmico de Injeção de Falhas -----------------------------------
 class FaultProfile:
     """
     Lê `Field/faults.json` dinamicamente (só re-parseia quando o arquivo muda).
@@ -68,7 +68,7 @@ class FaultProfile:
             if self._last_mtime is not None:
                 self._reset()
                 self._last_mtime = None
-                print("[FAULT] Todas as falhas removidas — operação normal restaurada.")
+                print("[FAULT] All faults cleared — normal operation restored.")
             return
 
         mtime = self.path.stat().st_mtime
@@ -79,7 +79,7 @@ class FaultProfile:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
-            print(f"[FAULT] Erro ao ler {self.path.name}: {exc}")
+            print(f"[FAULT] Failed to read {self.path.name}: {exc}")
             return
 
         self.sensor_overrides = {
@@ -91,13 +91,13 @@ class FaultProfile:
 
         if self.has_active_faults():
             print(
-                f"[FAULT] Perfil ativo -> sensors={self.sensor_overrides} | "
+                f"[FAULT] Active profile -> sensors={self.sensor_overrides} | "
                 f"base_speed={self.base_speed_factor:.2f}x | "
                 f"shield_speed={self.shield_speed_factor:.2f}x | "
                 f"conveyor_jam={self.conveyor_jam}"
             )
         else:
-            print("[FAULT] Perfil limpo — operação normal restaurada.")
+            print("[FAULT] Empty profile — normal operation restored.")
 
     def _reset(self) -> None:
         self.sensor_overrides = {}
@@ -120,7 +120,7 @@ class FaultProfile:
         return real_value
 
 
-# TCP Connection with OpenPLC ------------------------------------------------
+# Conexão Modbus TCP com o OpenPLC -------------------------------------------
 def connect_tcp_client(ip):
     client = ModbusTcpClient(ip, port=503, timeout=5)
     while not client.connect():
@@ -130,7 +130,7 @@ def connect_tcp_client(ip):
     return client
 
 
-# Passive Components ---------------------------------------------------------
+# Componentes Passivos -------------------------------------------------------
 class Workpiece:
     def __init__(self, ID):
         self.name = "Piece"
@@ -156,7 +156,7 @@ class Workpiece:
         self.ang_pos += speed
 
 
-# Actuators ------------------------------------------------------------------
+# Atuadores ------------------------------------------------------------------
 class ConveyorBelt:
     def __init__(self, length, motor_speed):
         self.speed = motor_speed
@@ -181,7 +181,7 @@ class ConveyorBelt:
         if self.status and not jammed:
             for piece in self.workpieces:
                 piece.x_move(self.speed)
-            # Removes pieces that reached the end of the conveyor
+            # Remove peças que chegaram ao fim da esteira
             self.workpieces = [p for p in self.workpieces if p.x_pos < self.length]
 
 
@@ -264,7 +264,7 @@ class SuctionShield:
             print("Suction off")
 
 
-# Sensors --------------------------------------------------------------------
+# Sensores -------------------------------------------------------------------
 class Sensor:
     def __init__(self, x_pos, y_pos):
         self.x_pos = float(x_pos)
@@ -284,7 +284,7 @@ class Sensor:
         return self.status
 
 
-# Main Loop ------------------------------------------------------------------
+# Loop Principal -------------------------------------------------------------
 if __name__ == "__main__":
 
     conveyor_belt = ConveyorBelt(length=100, motor_speed=MOTOR_SPEED)
@@ -293,7 +293,7 @@ if __name__ == "__main__":
         x_pos=MACHINE_X_POS,
         y_pos=BASE_Y_MIN,
         motor_speed=NOMINAL_BASE_SPEED,
-        rotation_speed=18,  # 360 deg every 10s
+        rotation_speed=18,  # 360 graus a cada 10s
     )
     shield = SuctionShield(
         x_pos=MACHINE_X_POS,
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         print("Waiting for OpenPLC Runtime (1s)...")
         sleep(1)
 
-        # Resets OpenPLC command coils (%QX) and state registers (%MW)
+        # Reseta as coils de comando (%QX) e os registradores de estado (%MW) no OpenPLC
         try:
             tcp_client.write_coils(address=RESET_COIL, values=[True])
             sleep(0.2)
@@ -344,7 +344,7 @@ if __name__ == "__main__":
                 tcp_client.close()
                 tcp_client = connect_tcp_client(TCP_IP)
 
-            # --- Updates sensors (Python -> PLC) ---
+            # --- Atualiza sensores (Python -> PLC) ---
             real_piece_sensor = False
 
             for piece in conveyor_belt.workpieces:
@@ -369,7 +369,7 @@ if __name__ == "__main__":
 
             sleep(TIME_SKIP)
 
-            # --- Reads PLC commands (PLC -> Python) ---
+            # --- Lê comandos do PLC (PLC -> Python) ---
             result = None
             try:
                 result = tcp_client.read_coils(address=PLC_COILS_START, count=7)
@@ -382,22 +382,22 @@ if __name__ == "__main__":
                 print("Error reading PLC coils")
                 coils = prev_coils
 
-            # Conveyor Command
+            # Comando da Esteira
             conveyor_belt.motor_on() if coils[0] else conveyor_belt.motor_off()
 
-            # Preparation for welding
+            # Preparação para soldagem
             if coils[1]:
                 base.lift(workpiece)
 
             if coils[4]:
                 shield.lower()
 
-            # Welding
+            # Soldagem
             burner.ignite() if coils[6] else burner.extinguish()
             if coils[2]:
                 base.rotate(workpiece)
 
-            # Welding completion
+            # Finalização da soldagem
             if coils[3]:
                 base.lower(workpiece)
 
@@ -407,7 +407,7 @@ if __name__ == "__main__":
             base.moving = bool(coils[1] or coils[3])
             shield.moving = bool(coils[4] or coils[5])
 
-            # Automatically adds new pieces
+            # Adiciona novas peças automaticamente na esteira
             if conveyor_belt.workpieces and conveyor_belt.workpieces[0].x_pos >= 25:
                 piece_id += 1
                 conveyor_belt.add_piece(Workpiece(piece_id))
@@ -415,7 +415,7 @@ if __name__ == "__main__":
 
             sleep(TIME_SKIP)
 
-            # Updates simulation
+            # Atualiza o passo da simulação
             conveyor_belt.update(jammed=faults.conveyor_jam)
             time_counter += TIME_SKIP * 2
 

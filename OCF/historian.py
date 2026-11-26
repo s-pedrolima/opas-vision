@@ -254,7 +254,7 @@ async def run_historian() -> None:
     close_dangling_states(conn)
     cycle_id = get_next_cycle_id(conn)
 
-    logging.info("Historian conectado ao SQLite em %s", DB_PATH)
+    logging.info("Historian connected to SQLite at %s", DB_PATH)
 
     last_values: list | None = None
     last_write_epoch: float = 0.0
@@ -268,7 +268,7 @@ async def run_historian() -> None:
     try:
         while True:
             try:
-                logging.info("Conectando ao servidor OPC UA em %s...", OPCUA_ENDPOINT)
+                logging.info("Connecting to OPC UA server at %s...", OPCUA_ENDPOINT)
                 async with Client(url=OPCUA_ENDPOINT) as client:
                     # Descoberta dinâmica do namespace pelo URI (boa prática O-PAS:
                     # não precisa chumbar ns=2 no código do cliente!).
@@ -278,7 +278,7 @@ async def run_historian() -> None:
                         for tag in TAG_NAMES
                     ]
                     logging.info(
-                        "Conectado! Namespace '%s' -> ns=%d | Monitorando %d tags.",
+                        "Connected! Namespace '%s' -> ns=%d | Monitoring %d tags.",
                         NAMESPACE_URI,
                         ns_idx,
                         len(nodes),
@@ -315,7 +315,7 @@ async def run_historian() -> None:
                                     close_reason=reason,
                                 )
                                 logging.info(
-                                    "Ciclo #%d | Estado %d (%s) encerrado em %.2fs (%s)",
+                                    "Cycle #%d | State %d (%s) closed in %.2fs (%s)",
                                     cycle_id,
                                     current_state,
                                     STATE_NAMES.get(current_state, "?"),
@@ -334,7 +334,7 @@ async def run_historian() -> None:
                             current_state = state
 
                             logging.info(
-                                "Ciclo #%d | Entrou no estado %d (%s)",
+                                "Cycle #%d | Entered state %d (%s)",
                                 cycle_id,
                                 state,
                                 STATE_NAMES.get(state, "?"),
@@ -344,7 +344,7 @@ async def run_historian() -> None:
 
             except (ConnectionError, OSError, asyncio.TimeoutError) as exc:
                 logging.warning(
-                    "Conexão OPC UA perdida (%s). Reconectando em %.0fs...",
+                    "OPC UA connection lost (%s). Reconnecting in %.0fs...",
                     exc,
                     RECONNECT_DELAY_SEC,
                 )
@@ -362,7 +362,7 @@ async def run_historian() -> None:
                 close_reason="shutdown",
             )
         conn.close()
-        logging.info("Conexão SQLite fechada com segurança.")
+        logging.info("SQLite connection closed cleanly.")
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ async def run_historian() -> None:
 def print_summary() -> None:
     """Exibe um resumo dos dados já gravados em OCF/data/historian.db."""
     if not DB_PATH.exists():
-        print(f"Banco ainda não encontrado em {DB_PATH}. Rode o historian primeiro.")
+        print(f"Database not found at {DB_PATH}. Start the historian first.")
         return
 
     conn = init_db(DB_PATH)
@@ -386,11 +386,11 @@ def print_summary() -> None:
     ).fetchone()[0]
 
     print(f"\n=== Historian Summary ({DB_PATH.name}) ===")
-    print(f"Amostras na tabela telemetry : {total_telemetry}")
-    print(f"Ciclos registrados           : {total_cycles}")
-    print(f"Estados parciais excluídos   : {excluded} (shutdown / partial_startup)")
+    print(f"Telemetry rows          : {total_telemetry}")
+    print(f"Recorded cycles         : {total_cycles}")
+    print(f"Excluded partial states : {excluded} (shutdown / partial_startup)")
 
-    print("\n--- Tempo médio por estado (transições completas) ---")
+    print("\n--- Average duration per state (completed transitions) ---")
     rows = conn.execute(
         """
         SELECT state, state_name, COUNT(*), ROUND(AVG(duration_sec), 2),
@@ -404,13 +404,13 @@ def print_summary() -> None:
     ).fetchall()
 
     if rows:
-        print(f"{'Estado':<24} {'Qtd':>4} {'Média(s)':>9} {'Min(s)':>8} {'Max(s)':>8}")
+        print(f"{'State':<24} {'Cnt':>4} {'Avg(s)':>9} {'Min(s)':>8} {'Max(s)':>8}")
         for st, name, cnt, avg_d, min_d, max_d in rows:
             print(f"{f'{st} - {name}':<24} {cnt:>4} {avg_d:>9.2f} {min_d:>8.2f} {max_d:>8.2f}")
     else:
-        print("Nenhum estado concluído ainda.")
+        print("No completed states recorded yet.")
 
-    print("\n--- Últimas 8 transições ---")
+    print("\n--- Last 8 transitions ---")
     recent = conn.execute(
         """
         SELECT cycle_id, state, state_name, started_at, duration_sec, close_reason
@@ -421,11 +421,11 @@ def print_summary() -> None:
     ).fetchall()
     for cid, st, name, started, dur, reason in reversed(recent):
         if dur is None:
-            dur_str = "EM ANDAMENTO..."
+            dur_str = "IN_PROGRESS..."
         else:
             tag = f" [{reason}]" if reason and reason != "transition" else ""
             dur_str = f"{dur:.2f}s{tag}"
-        print(f"  Ciclo #{cid:<3} | {st} - {name:<18} | início {started[11:19]}Z | {dur_str}")
+        print(f"  Cycle #{cid:<3} | {st} - {name:<18} | start {started[11:19]}Z | {dur_str}")
 
     conn.close()
 
@@ -435,7 +435,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--summary",
         action="store_true",
-        help="Mostra um resumo dos dados gravados no SQLite e sai",
+        help="Print a summary of recorded SQLite data and exit",
     )
     args = parser.parse_args()
 
@@ -450,4 +450,4 @@ if __name__ == "__main__":
         try:
             asyncio.run(run_historian())
         except KeyboardInterrupt:
-            print("\nHistorian encerrado.")
+            print("\nHistorian stopped.")

@@ -214,7 +214,7 @@ def get_live_machine_state() -> dict[str, Any]:
         # estruturado — isso é uma evidência útil pro diagnóstico (ex.: OCF offline).
         return {
             "server_time_utc": _now_utc_iso(),
-            "error": "Falha ao ler servidor OPC UA",
+            "error": "Failed to read OPC UA server",
             "endpoint": OPCUA_ENDPOINT,
             "details": str(exc),
         }
@@ -226,7 +226,7 @@ def get_live_machine_state() -> dict[str, Any]:
 def _open_historian_readonly() -> sqlite3.Connection:
     """Abre o SQLite em modo somente-leitura (segurança: agente não altera histórico)."""
     if not DB_PATH.exists():
-        raise FileNotFoundError(f"Banco Historian não encontrado em {DB_PATH}")
+        raise FileNotFoundError(f"Historian database not found at {DB_PATH}")
     # mode=ro garante a nível de SQLite que nenhuma query aqui consegue escrever
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row  # Permite acessar colunas por nome (row["avg_sec"])
@@ -439,7 +439,7 @@ def read_plc_logic() -> dict[str, Any]:
     e melhora o raciocínio do modelo.
     """
     if not PLC_XML_PATH.exists():
-        return {"error": f"Arquivo PLC não encontrado em {PLC_XML_PATH}"}
+        return {"error": f"PLC file not found at {PLC_XML_PATH}"}
 
     try:
         tree = ET.parse(PLC_XML_PATH)
@@ -482,7 +482,7 @@ def read_plc_logic() -> dict[str, Any]:
             "structured_text_code": st_code,
         }
     except Exception as exc:
-        return {"error": f"Falha ao parsear {PLC_XML_PATH.name}: {exc}"}
+        return {"error": f"Failed to parse {PLC_XML_PATH.name}: {exc}"}
 
 
 # ---------------------------------------------------------------------------
@@ -520,14 +520,14 @@ def get_docker_status(tail_logs: int = 12) -> dict[str, Any]:
             ]
         )
     except FileNotFoundError:
-        return {"server_time_utc": _now_utc_iso(), "error": "CLI 'docker' não encontrado na máquina."}
+        return {"server_time_utc": _now_utc_iso(), "error": "'docker' CLI not found on host."}
     except subprocess.TimeoutExpired:
-        return {"server_time_utc": _now_utc_iso(), "error": "Timeout ao consultar Docker Swarm."}
+        return {"server_time_utc": _now_utc_iso(), "error": "Timeout querying Docker Swarm."}
 
     if ls_proc.returncode != 0:
         return {
             "server_time_utc": _now_utc_iso(),
-            "error": "Falha ao consultar Docker Swarm",
+            "error": "Failed to query Docker Swarm",
             "stderr": ls_proc.stderr.strip(),
         }
 
@@ -540,7 +540,7 @@ def get_docker_status(tail_logs: int = 12) -> dict[str, Any]:
             "running": False,
             "active_services_count": 0,
             "services": [],
-            "note": "Nenhum serviço da stack DCN (OpenPLC/Node-RED) está implantado ou em execução no Docker Swarm.",
+            "note": "No DCN stack services (OpenPLC/Node-RED) are currently deployed or running in Docker Swarm.",
         }
 
     services_info: list[dict[str, Any]] = []
@@ -606,17 +606,38 @@ def _parse_incident_markdown(path: Path) -> dict[str, Any]:
     """Extrai cabeçalho e resumo de um relatório `.md` de incidente sem inflar contexto."""
     text = path.read_text(encoding="utf-8", errors="replace")
 
-    kind_match = re.search(r"^#\s*Relatório de Incidente\s*[—-]\s*(.+)$", text, re.MULTILINE)
-    ts_match = re.search(r"-\s*\*\*Data/Hora:\*\*\s*(.+)$", text, re.MULTILINE)
-    trigger_match = re.search(r"-\s*\*\*Gatilho Determinístico:\*\*\s*(.+)$", text, re.MULTILINE)
+    # Aceita tanto cabeçalhos antigos em português quanto cabeçalhos em inglês
+    kind_match = re.search(
+        r"^#\s*(?:Relatório de Incidente|Incident Report)\s*[—-]\s*(.+)$",
+        text,
+        re.MULTILINE,
+    )
+    ts_match = re.search(
+        r"-\s*\*\*(?:Data/Hora|Timestamp):\*\*\s*(.+)$",
+        text,
+        re.MULTILINE,
+    )
+    trigger_match = re.search(
+        r"-\s*\*\*(?:Gatilho Determinístico|Deterministic Trigger):\*\*\s*(.+)$",
+        text,
+        re.MULTILINE,
+    )
 
-    # Tenta capturar a seção "### Resumo" ou "**Resumo:**"; senão usa o início do corpo
+    # Tenta capturar a seção "### Resumo"/"### Summary"; senão usa o início do corpo
     summary_text = ""
-    resumo_match = re.search(r"###\s*Resumo\s*\n+(.+?)(?:\n###|\Z)", text, re.DOTALL)
+    resumo_match = re.search(
+        r"###\s*(?:Resumo|Summary)\s*\n+(.+?)(?:\n###|\Z)",
+        text,
+        re.DOTALL,
+    )
     if resumo_match:
         summary_text = resumo_match.group(1).strip()
     else:
-        inline_resumo = re.search(r"\*\*Resumo:\*\*\s*(.+)$", text, re.MULTILINE)
+        inline_resumo = re.search(
+            r"\*\*(?:Resumo|Summary):\*\*\s*(.+)$",
+            text,
+            re.MULTILINE,
+        )
         if inline_resumo:
             summary_text = inline_resumo.group(1).strip()
         else:
@@ -666,9 +687,9 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_live_machine_state",
             "description": (
-                "Lê em tempo real (via OPC UA) o estado atual da máquina de estados "
-                "(Machine_State) e o valor booleano de todos os 7 atuadores e 5 sensores "
-                "da Welding Station. Use para ver a fotografia de AGORA da máquina."
+                "Reads the real-time Welding Station snapshot via OPC UA: current FSM "
+                "state (Machine_State) and boolean values for all 7 actuators and 5 sensors. "
+                "Use to inspect the current live state of the station."
             ),
             "parameters": {
                 "type": "object",
@@ -682,12 +703,12 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_state_statistics",
             "description": (
-                "Consulta o Historian (SQLite) e retorna: (1) estatísticas por estado da FSM "
-                "com mediana histórica (baseline_median_sec), mediana recente dos últimos 3 ciclos "
-                "(recent_median_sec), desvio percentual (delta_pct), média, mín/máx e throughput "
-                "baseline vs. recente; e (2) `actuator_timings` com o tempo de curso individual de "
-                "cada atuador linear (Base_Up, Shield_Down, Shield_Up, Base_Down). Use para linha "
-                "de base, gargalos e distinguir falhas locais de degradação compartilhada."
+                "Queries the SQLite Historian and returns: (1) per-state FSM statistics "
+                "including historical median (baseline_median_sec), recent 3-cycle median "
+                "(recent_median_sec), percentage drift (delta_pct), avg/min/max, and "
+                "baseline vs. recent throughput; and (2) `actuator_timings` with individual "
+                "stroke durations for each linear actuator (Base_Up, Shield_Down, Shield_Up, "
+                "Base_Down). Use for baselines, bottlenecks, and isolating local vs. shared degradation."
             ),
             "parameters": {
                 "type": "object",
@@ -701,18 +722,18 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_recent_cycles",
             "description": (
-                "Consulta o Historian (SQLite) e retorna as transições de estado mais "
-                "recentes em ordem cronológica, incluindo relógio atual (`server_time_utc`), "
-                "idade da última telemetria/transição (`last_telemetry_age_sec`, `last_event_age_sec`), "
-                "se há algum estado EM ANDAMENTO (`has_open_state`) e há quantos segundos (`elapsed_sec`) "
-                "ele está aberto. Use para detectar travamentos, frescor dos dados ou ciclos lentos."
+                "Queries the SQLite Historian and returns the most recent FSM state "
+                "transitions in chronological order, including server clock (`server_time_utc`), "
+                "telemetry/event freshness (`last_telemetry_age_sec`, `last_event_age_sec`), "
+                "whether a state is currently open (`has_open_state`), and how many seconds "
+                "(`elapsed_sec`) it has been active. Use to detect stalls, staleness, or slow cycles."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "limit": {
                         "type": "integer",
-                        "description": "Quantidade de transições recentes a retornar (entre 1 e 50, padrão 10).",
+                        "description": "Number of recent transitions to return (1 to 50, default 10).",
                         "default": 10,
                     }
                 },
@@ -725,9 +746,9 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "read_plc_logic",
             "description": (
-                "Lê o código de controle IEC 61131-3 (Structured Text) e a tabela de "
-                "variáveis/endereços do OpenPLC da Welding Station. Use para verificar "
-                "quais sensores e condições destravam cada transição de estado da FSM."
+                "Reads the IEC 61131-3 Structured Text control logic and variable/address "
+                "table from OpenPLC (`DCN/Controller/plc.xml`). Use to verify which sensors "
+                "and conditions drive each FSM transition and actuator."
             ),
             "parameters": {
                 "type": "object",
@@ -741,17 +762,17 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_docker_status",
             "description": (
-                "Inspeciona os serviços da stack DCN (`dcn-ws`: OpenPLC e Node-RED) no "
-                "Docker Swarm, retornando se a stack está ativa (`running`), réplicas, "
-                "imagem/versão, histórico de restarts/falhas e últimas linhas de log. "
-                "Use para verificar se a máquina/DCN está no ar ou investigar falhas de container."
+                "Inspects the DCN Docker Swarm stack (`dcn-ws`: OpenPLC and Node-RED), "
+                "returning whether the stack is active (`running`), replicas, image/version, "
+                "recent task/restart history, and tail logs per service. Use to verify DCN "
+                "container health or investigate container crashes."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "tail_logs": {
                         "type": "integer",
-                        "description": "Quantidade de linhas finais de log por serviço (entre 0 e 30, padrão 12).",
+                        "description": "Number of tail log lines per service (0 to 30, default 12).",
                         "default": 12,
                     }
                 },
@@ -764,17 +785,16 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_recent_incidents",
             "description": (
-                "Consulta a memória episódica de incidentes já diagnosticados pelo "
-                "Watcher/Agente em `ACP/incidents/`, retornando data/hora, gatilho e "
-                "resumo de cada ocorrência passada. Use para verificar se um problema "
-                "é recorrente ou consequência de um evento anterior recente."
+                "Queries episodic memory of past incidents diagnosed by the Watcher/Agent "
+                "in `ACP/incidents/`, returning timestamp, deterministic trigger, and summary. "
+                "Use to correlate current alerts with recurring or prior events."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "limit": {
                         "type": "integer",
-                        "description": "Quantidade de incidentes mais recentes a retornar (entre 1 e 15, padrão 5).",
+                        "description": "Number of most recent incidents to return (1 to 15, default 5).",
                         "default": 5,
                     }
                 },
@@ -803,7 +823,7 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> str:
     func = TOOL_REGISTRY.get(name)
     if func is None:
         return json.dumps(
-            {"error": f"Tool desconhecida: '{name}'", "available_tools": list(TOOL_REGISTRY.keys())},
+            {"error": f"Unknown tool: '{name}'", "available_tools": list(TOOL_REGISTRY.keys())},
             ensure_ascii=False,
         )
 
@@ -813,7 +833,7 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> str:
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as exc:
         return json.dumps(
-            {"error": f"Erro ao executar tool '{name}': {exc}"},
+            {"error": f"Failed to execute tool '{name}': {exc}"},
             ensure_ascii=False,
         )
 

@@ -17,6 +17,9 @@ deploy.log
 /OCF/data/
 /Field/faults.json
 ACP/incidents/
+ACP/work_orders/
+ACP/pending_approvals/
+ACP/audit_log.jsonl
 
 # Build / IDE / Agent runtime
 build/

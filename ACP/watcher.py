@@ -38,8 +38,10 @@ from typing import Any
 
 # Permite rodar tanto `python ACP/watcher.py` quanto `python -m ACP.watcher`
 try:
+    from ACP.actions import ActionContext
     from ACP.agent import SYSTEM_PROMPT, build_client, run_agent_turn
 except ImportError:
+    from actions import ActionContext
     from agent import SYSTEM_PROMPT, build_client, run_agent_turn
 
 # ---------------------------------------------------------------------------
@@ -535,6 +537,7 @@ def run_watcher(dry_run: bool = False, verbose: bool = False) -> None:
                 messages,
                 prompt_to_send,
                 verbose=verbose,
+                action_context=ActionContext(mode="autonomous", actor="acp_watcher"),
             )
 
             report_path = save_incident_report(transition, model, diagnosis)

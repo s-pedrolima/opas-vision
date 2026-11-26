@@ -1,13 +1,13 @@
 """
-Agent v0 da camada ACP (Advanced Computing Platform) — Python puro + OpenAI SDK.
+Agent da camada ACP (Advanced Computing Platform) — Python puro + OpenAI SDK.
 
 Este arquivo implementa o "coração" de um Agente de IA sem caixas-pretas:
-um loop `while` que conversa com a LLM, executa as tools reais que ela pedir
-(OPC UA, Historian SQLite, lógica IEC 61131-3) e devolve os resultados até ela
-ter evidências suficientes para responder.
+um loop `while` que conversa com a LLM, executa as tools de leitura (OPC UA,
+Historian SQLite, lógica IEC 61131-3, Docker, incidentes) e as tools de ação
+protegidas por Defesa em Profundidade (Allowlist, Interlock, HITL e Auditoria).
 
 Como rodar:
-    # Modo chat interativo:
+    # Modo chat interativo (permite aprovação Human-in-the-Loop no terminal):
     ./.venv/bin/python ACP/agent.py
 
     # Pergunta única direta:
@@ -24,16 +24,52 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Apenas importar `readline` ativa edição de linha (Backspace, setas ←/→ e histórico ↑/↓) no input()
+try:
+    import readline  # noqa: F401
+except ImportError:
+    pass
+
 from dotenv import load_dotenv
 from openai import OpenAI
 
 # Permite rodar tanto `python ACP/agent.py` quanto `python -m ACP.agent`
 try:
+    from ACP.actions import (
+        ACTION_TOOL_REGISTRY,
+        ACTION_TOOL_SCHEMAS,
+        ActionContext,
+        set_action_context,
+    )
     from ACP.tools import TOOL_SCHEMAS, execute_tool
 except ImportError:
+    from actions import (
+        ACTION_TOOL_REGISTRY,
+        ACTION_TOOL_SCHEMAS,
+        ActionContext,
+        set_action_context,
+    )
     from tools import TOOL_SCHEMAS, execute_tool
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+ALL_TOOL_SCHEMAS: list[dict[str, Any]] = [*TOOL_SCHEMAS, *ACTION_TOOL_SCHEMAS]
+
+
+def dispatch_tool(name: str, arguments: dict[str, Any] | None = None) -> str:
+    """Despacha para tools de leitura (`ACP/tools.py`) ou de ação segura (`ACP/actions.py`)."""
+    action_fn = ACTION_TOOL_REGISTRY.get(name)
+    if action_fn is not None:
+        try:
+            result = action_fn(**(arguments or {}))
+            return json.dumps(result, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            return json.dumps(
+                {"error": f"Failed to execute action '{name}': {exc}"},
+                ensure_ascii=False,
+            )
+    return execute_tool(name, arguments)
+
 
 # ---------------------------------------------------------------------------
 # System Prompt: define papel, regras de investigação e limites do agente
@@ -68,8 +104,10 @@ Regras obrigatórias de conduta:
      como evidência real no diagnóstico, sem inventar leituras.
 5. Responda sempre em português claro, objetivo e técnico, estruturando diagnósticos
    com: Situação / Evidências / Causa Raiz (ou Gargalo) / Recomendação.
-6. Você tem acesso SOMENTE LEITURA ao sistema OT. Nunca afirme que executou ações
-   físicas na máquina ou no Docker.
+6. Ferramentas de ação (`create_maintenance_ticket`, `restart_dcn_service`) possuem
+   intertravamentos determinísticos e aprovação Human-in-the-Loop. NUNCA afirme que
+   uma ação foi executada sem verificar o campo `status` retornado pela tool
+   (`CREATED`/`EXECUTED` vs. `BLOCKED_BY_INTERLOCK`/`DENIED_BY_HUMAN`/`PENDING_HUMAN_APPROVAL`/`TIMEOUT_REACHED`).
 """.strip()
 
 # Guardrail de segurança: impede que a LLM entre em loop infinito chamando tools
@@ -89,8 +127,8 @@ def build_client() -> tuple[OpenAI, str]:
 
     if not api_key:
         print(
-            "[ERRO] Configure LLM_API_KEY no arquivo .env antes de rodar o agente.\n"
-            "       Veja o modelo em .env.example.",
+            "[ERROR] Configure LLM_API_KEY in .env before running the agent.\n"
+            "        See .env.example for reference.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -117,11 +155,15 @@ def run_agent_turn(
     messages: list[dict[str, Any]],
     user_input: str,
     verbose: bool = False,
+    action_context: ActionContext | None = None,
 ) -> str:
     """
     Executa um turno completo de conversa (pergunta do usuário -> 0..N chamadas
     de tools -> resposta final fundamentada da LLM).
     """
+    if action_context is not None:
+        set_action_context(action_context)
+
     messages.append({"role": "user", "content": user_input})
 
     total_prompt_tokens = 0
@@ -132,7 +174,7 @@ def run_agent_turn(
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            tools=TOOL_SCHEMAS,
+            tools=ALL_TOOL_SCHEMAS,
             tool_choice="auto",  # A própria LLM decide se chama tool(s) ou já responde
             temperature=0.2,     # Temperatura baixa = mais precisão técnica, menos "criatividade"
         )
@@ -146,7 +188,7 @@ def run_agent_turn(
 
         # 2. Caso A: a LLM NÃO pediu nenhuma tool -> ela terminou de investigar!
         if not assistant_msg.tool_calls:
-            final_text = assistant_msg.content or "(Sem resposta textual da LLM)"
+            final_text = assistant_msg.content or "(No textual response from LLM)"
             messages.append({"role": "assistant", "content": final_text})
             _print_token_usage(total_prompt_tokens, total_completion_tokens)
             return final_text
@@ -178,20 +220,20 @@ def run_agent_turn(
             tool_name = tc.function.name
             raw_args = tc.function.arguments or "{}"
 
-            print(f"  [passo {step}] -> chamando tool: {tool_name}({raw_args})")
+            print(f"  [step {step}] -> calling tool: {tool_name}({raw_args})")
 
             try:
                 parsed_args = json.loads(raw_args)
             except json.JSONDecodeError as exc:
                 tool_result = json.dumps(
-                    {"error": f"Argumentos JSON inválidos enviados pela LLM: {exc}"},
+                    {"error": f"Invalid JSON arguments sent by LLM: {exc}"},
                     ensure_ascii=False,
                 )
             else:
-                tool_result = execute_tool(tool_name, parsed_args)
+                tool_result = dispatch_tool(tool_name, parsed_args)
 
             if verbose:
-                print(f"  [resultado {tool_name}]:\n{tool_result}\n")
+                print(f"  [result {tool_name}]:\n{tool_result}\n")
             else:
                 # Resumo curto de 1 linha para acompanhar o raciocínio sem poluir o terminal
                 preview = tool_result.replace("\n", " ")
@@ -212,7 +254,7 @@ def run_agent_turn(
     # Síntese graciosa: se consumiu todos os passos chamando tools, faz 1 chamada final
     # SEM tools para obrigar o modelo a sintetizar tudo o que já coletou (em vez de
     # jogar fora o trabalho dos 8 passos!).
-    print(f"  [limite {MAX_AGENT_STEPS} passos] -> solicitando síntese final sem novas tools...")
+    print(f"  [limit {MAX_AGENT_STEPS} steps] -> requesting final synthesis without tools...")
     synthesis_messages = [
         *messages,
         {
@@ -240,12 +282,12 @@ def run_agent_turn(
             _print_token_usage(total_prompt_tokens, total_completion_tokens)
             return final_text
     except Exception as exc:
-        print(f"  [erro na síntese final]: {exc}", file=sys.stderr)
+        print(f"  [final synthesis error]: {exc}", file=sys.stderr)
 
     _print_token_usage(total_prompt_tokens, total_completion_tokens)
     return (
-        f"[AVISO] O agente atingiu o limite máximo de {MAX_AGENT_STEPS} passos "
-        "sem concluir uma resposta final."
+        f"[WARN] Agent reached max limit of {MAX_AGENT_STEPS} steps "
+        "without producing a final response."
     )
 
 
@@ -257,17 +299,18 @@ def main() -> None:
     parser.add_argument(
         "prompt",
         nargs="?",
-        help="Pergunta única opcional (se omitida, abre chat interativo)",
+        help="Optional single prompt (if omitted, starts interactive chat)",
     )
     parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
-        help="Mostra o JSON completo retornado por cada tool",
+        help="Print full JSON returned by each tool",
     )
     args = parser.parse_args()
 
     client, model = build_client()
+    interactive_ctx = ActionContext(mode="interactive", actor="acp_agent")
 
     # O histórico de mensagens começa SEMPRE com o System Prompt.
     # É mantendo essa lista viva entre turnos que o agente tem "memória de curto prazo"!
@@ -275,34 +318,58 @@ def main() -> None:
 
     # Modo pergunta única (ex.: python ACP/agent.py "Como está a máquina?")
     if args.prompt:
-        print(f"Modelo: {model}\n")
-        answer = run_agent_turn(client, model, messages, args.prompt, verbose=args.verbose)
-        print(f"\n=== Resposta do Agente ===\n{answer}\n")
+        print(f"Model: {model}\n")
+        answer = run_agent_turn(
+            client,
+            model,
+            messages,
+            args.prompt,
+            verbose=args.verbose,
+            action_context=interactive_ctx,
+        )
+        print(f"\n=== Agent Response ===\n{answer}\n")
         return
 
     # Modo chat interativo
     print(f"=== O-PAS ACP Agent ({model}) ===")
-    print("Comandos: '/quit' para encerrar | '/reset' para limpar memória da conversa\n")
+    print("Commands: '/quit' ('/exit') to exit | '/reset' ('/clear', '/new') to clear memory\n")
 
     while True:
         try:
-            user_input = input("Você > ").strip()
+            user_input = input("You > ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nEncerrando agente.")
+            print("\nShutting down agent.")
             break
 
         if not user_input:
             continue
-        if user_input.lower() == "/quit":
-            break
-        if user_input.lower() == "/reset":
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-            print("[memória da conversa limpa]\n")
-            continue
+        if user_input.startswith("/"):
+            command = user_input.lower().strip().split()[0]
+            if command in ("/quit", "/exit"):
+                break
+            elif command in ("/reset", "/clear", "/new"):
+                messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+                print("[conversation memory cleared]\n")
+                continue
+            else:
+                print(
+                    f"[warn] Unknown command '{command}'. "
+                    "Use '/quit' ('/exit') or '/reset' ('/clear', '/new').\n"
+                )
+                continue
 
         print()
-        answer = run_agent_turn(client, model, messages, user_input, verbose=args.verbose)
-        print(f"\nAgente >\n{answer}\n")
+
+        answer = run_agent_turn(
+            client,
+            model,
+            messages,
+            user_input,
+            verbose=args.verbose,
+            action_context=interactive_ctx,
+        )
+
+        print(f"\nAgent >\n{answer}\n")
 
 
 if __name__ == "__main__":
